@@ -12,6 +12,8 @@ build/
 # Environment / secrets
 .env
 *.env.local
+.kiro/settings/
+.kiro/mcp.json
 
 # Node
 node_modules/
@@ -28,6 +30,10 @@ out/
 # Database
 *.sqlite
 *.db
+.pgdata/
+.pgsockets/
+.uvicorn/
+
 
 # Logs
 *.log
