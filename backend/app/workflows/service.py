@@ -257,3 +257,27 @@ def get_brief_for_workflow_run(db: Session, workflow_run_id: UUID) -> ContentBri
             detail=f"Content brief artifact not found for workflow run {workflow_run_id}."
         )
     return brief
+
+def get_draft_for_workflow_run(db: Session, workflow_run_id: UUID) -> tuple[Content, list[ContentVersion]]:
+    """
+    Returns the Content container and all its versions for a workflow run,
+    ordered with the most recent version first (index 0 = current draft).
+    """
+    content = (
+        db.query(Content)
+        .filter(Content.workflow_run_id == workflow_run_id)
+        .first()
+    )
+    if content is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No content found for workflow run {workflow_run_id}.",
+        )
+
+    versions = (
+        db.query(ContentVersion)
+        .filter(ContentVersion.content_id == content.id)
+        .order_by(ContentVersion.version_number.desc())
+        .all()
+    )
+    return content, versions

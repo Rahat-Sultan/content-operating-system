@@ -519,10 +519,13 @@ This table maps every screen in the information architecture to the backing back
 | **Idea Detail** | Fetch Supporting Sources | `GET /api/ideas/{id}/sources` | **Missing** | Returns items linked via `idea_source_items` |
 | **Idea Detail** | **Start Production Run** | `POST /api/workflow-runs` | **Exists** | Accepts `strategy_id`, `idea_id`. Returns 200 or 409 |
 | **Workflow Run** | **Fetch Run Status** | `GET /api/workflow-runs/{id}` | **Exists** | Returns `workflow_run_id`, `status`, `error` |
+| **Workflow Run** | Fetch Research Artifact | `GET /api/workflow-runs/{id}/research` | **Missing** | Returns `summary`, `findings`, `sources` from DB |
+| **Workflow Run** | Fetch Content Brief | `GET /api/workflow-runs/{id}/brief` | **Missing** | Returns `brief` JSONB from `content_briefs` |
 | **Workflow Run** | **Fetch Research Artifact** | `GET /api/workflow-runs/{id}/research` | **Exists** | Returns `summary`, `findings`, `sources` from DB |
 | **Workflow Run** | **Fetch Content Brief** | `GET /api/workflow-runs/{id}/brief` | **Exists** | Returns `brief` JSONB from `content_briefs` |
 | **Workflow Run** | Fetch Content Draft & Versions | `GET /api/workflow-runs/{id}/content` | **Missing** | Returns versions list from `content` & `content_versions` |
 | **Workflow Run** | Cancel Run Execution | `POST /api/workflow-runs/{id}/cancel` | **Missing** | Updates status to `CANCELLED` |
+| **Approval Console** | **Submit Approval Decision** | `POST /api/workflow-runs/{id}/approval` | **Missing** | Accepts `content_version_id`, `decision`, `feedback` |
 | **Approval Console** | **Submit Approval Decision** | `POST /api/workflow-runs/{id}/approval` | **Exists** | Accepts `content_version_id`, `decision`, `feedback` |
 | **Strategies** | List Strategies | `GET /api/strategies` | **Missing** | Returns list of strategies |
 | **Strategies** | Toggle / Update Strategy | `PATCH /api/strategies/{id}` | **Missing** | Updates enabled flag or config |

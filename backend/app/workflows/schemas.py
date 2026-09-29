@@ -58,3 +58,22 @@ class ContentBriefResponse(BaseModel):
     workflow_run_id: UUID
     brief: dict[str, Any]
     created_at: datetime
+
+class ContentVersionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    version_number: int
+    origin: str
+    title: str | None = None
+    body: str
+    created_at: datetime
+
+
+class ContentDraftResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    content_id: UUID
+    workflow_run_id: UUID
+    current_version: ContentVersionSummary
+    versions: list[ContentVersionSummary]
