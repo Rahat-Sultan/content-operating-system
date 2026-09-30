@@ -28,6 +28,7 @@ export interface SourceItemSummary {
 
 export interface WorkflowRunResponse {
   id: string;
+  workflow_run_id?: string;
   idea_id: string;
   strategy_id: string;
   status: "PENDING" | "RUNNING" | "PAUSED" | "NEEDS_REVIEW" | "PUBLISHING" | "COMPLETED" | "FAILED" | "REJECTED" | "CANCELLED";
@@ -35,6 +36,47 @@ export interface WorkflowRunResponse {
   started_at: string;
   resolved_at?: string | null;
   error?: string | null;
+}
+
+export interface ResearchResponse {
+  id: string;
+  workflow_run_id: string;
+  summary?: string | null;
+  findings: Record<string, any>;
+  sources: Record<string, any>;
+  created_at: string;
+}
+
+export interface ContentBriefResponse {
+  id: string;
+  workflow_run_id: string;
+  brief: Record<string, any>;
+  created_at: string;
+}
+
+export interface ContentVersionSummary {
+  id: string;
+  version_number: number;
+  origin: string;
+  title?: string | null;
+  body: string;
+  created_at: string;
+}
+
+export interface ContentDraftResponse {
+  content_id: string;
+  workflow_run_id: string;
+  current_version: ContentVersionSummary;
+  versions: ContentVersionSummary[];
+}
+
+export interface ApprovalDecisionResponse {
+  workflow_run_id: string;
+  approval_id: string;
+  content_version_id: string;
+  status: string;
+  decision: "APPROVED" | "REJECTED" | "REVISION_REQUESTED";
+  feedback?: string | null;
 }
 
 export async function fetchIdeas(status?: string): Promise<IdeaItem[]> {
@@ -88,7 +130,12 @@ export async function startWorkflowRun(ideaId: string, strategyId: string): Prom
     throw error;
   }
 
-  return data;
+  return {
+    ...data,
+    id: data.id || data.workflow_run_id,
+    workflow_run_id: data.workflow_run_id || data.id,
+    started_at: data.started_at || data.created_at,
+  };
 }
 
 export async function fetchWorkflowRun(id: string): Promise<WorkflowRunResponse> {
@@ -102,4 +149,54 @@ export async function fetchWorkflowRun(id: string): Promise<WorkflowRunResponse>
     id: data.id || data.workflow_run_id,
     started_at: data.started_at || data.created_at,
   };
+}
+
+export async function fetchWorkflowRunResearch(id: string): Promise<ResearchResponse> {
+  const res = await fetch(`${API_BASE}/workflow-runs/${id}/research`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch research for workflow run ${id}: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchWorkflowRunBrief(id: string): Promise<ContentBriefResponse> {
+  const res = await fetch(`${API_BASE}/workflow-runs/${id}/brief`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch brief for workflow run ${id}: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchWorkflowRunDraft(id: string): Promise<ContentDraftResponse> {
+  const res = await fetch(`${API_BASE}/workflow-runs/${id}/draft`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch draft for workflow run ${id}: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function submitApprovalDecision(
+  workflowRunId: string,
+  contentVersionId: string,
+  decision: "APPROVED" | "REJECTED" | "REVISION_REQUESTED",
+  feedback?: string
+): Promise<ApprovalDecisionResponse> {
+  const res = await fetch(`${API_BASE}/workflow-runs/${workflowRunId}/approval`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      content_version_id: contentVersionId,
+      decision,
+      feedback: feedback || null,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const message = data.detail || `Approval submission failed with status ${res.status}`;
+    throw new Error(message);
+  }
+  return data;
 }

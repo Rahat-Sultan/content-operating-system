@@ -48,14 +48,17 @@ def approval_node(state: ContentGraphState) -> dict:
     }
 
 
-def route_approval_decision(state: ContentGraphState) -> Literal["writer", "__end__"]:
+def route_approval_decision(state: ContentGraphState) -> Literal["writer", "publisher", "__end__"]:
     """
     Conditional routing edge after approval:
     - REVISION_REQUESTED -> routes back to writer
-    - APPROVED -> routes to END (Publisher deferred to future task)
+    - APPROVED -> routes to publisher
     - REJECTED (or anything else) -> routes to END
     """
     status = state.get("approval_status")
     if status == "REVISION_REQUESTED":
         return "writer"
+    if status == "APPROVED":
+        return "publisher"
     return "__end__"
+

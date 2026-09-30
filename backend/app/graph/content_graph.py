@@ -13,6 +13,7 @@ from app.graph.nodes.research import research_node
 from app.graph.nodes.brief import brief_node
 from app.graph.nodes.writer import writer_node
 from app.graph.nodes.approval import approval_node, route_approval_decision
+from app.graph.nodes.publisher import publisher_node
 from app.graph.state import ContentGraphState
 from app.workflows.models import WorkflowRun, WorkflowRunStatus
 
@@ -27,7 +28,9 @@ def build_content_graph():
                    +--------------------------+--------------------------+
                 REJECT                     REVISION                   APPROVE
                    |                          |                          |
-                  END                       writer                      END
+                  END                       writer                   publisher
+                                                                         |
+                                                                        END
     """
     builder = StateGraph(ContentGraphState)
 
@@ -38,6 +41,7 @@ def build_content_graph():
     builder.add_node("brief", brief_node)
     builder.add_node("writer", writer_node)
     builder.add_node("approval", approval_node)
+    builder.add_node("publisher", publisher_node)
 
     # Edges
     builder.add_edge(START, "research")
@@ -51,9 +55,13 @@ def build_content_graph():
         route_approval_decision,
         {
             "writer": "writer",
+            "publisher": "publisher",
             "__end__": END,
         }
     )
+
+    # Edge from publisher to END
+    builder.add_edge("publisher", END)
 
     return builder
 

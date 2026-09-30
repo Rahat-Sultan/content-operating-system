@@ -80,7 +80,8 @@ export default function IdeaDetailPage({
     },
     onSuccess: (data) => {
       setConflictError(null);
-      router.push(`/workflow-runs/${data.id}`);
+      const targetId = data.workflow_run_id || data.id;
+      router.push(`/workflow-runs/${targetId}`);
     },
     onError: (err: any) => {
       if (err.status === 409 || err.message?.includes("Active workflow run already exists")) {

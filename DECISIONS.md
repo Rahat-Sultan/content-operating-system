@@ -169,3 +169,15 @@ External APIs are accessed through integration modules.
 Reason:
 
 Providers may change and business/domain code should not depend on provider-specific implementations.
+
+---
+
+## ADR-015 — OpenRouter as Primary LLM Gateway (NVIDIA NIM Regional Unavailability)
+
+Decision:
+
+Use OpenRouter (`https://openrouter.ai/api/v1/chat/completions`) as the primary external LLM gateway, leveraging free-tier models (primary: `nvidia/nemotron-3-super-120b-a12b:free`, fallback: `openrouter/free`), with explicit placeholder detection.
+
+Reason:
+
+NVIDIA NIM direct API (`build.nvidia.com`) is regionally restricted/blocked in this deployment location. OpenRouter provides reliable, unrestricted access to top open models (including NVIDIA Nemotron) without region locks, ensuring resilient structured discovery and scoring workflows.

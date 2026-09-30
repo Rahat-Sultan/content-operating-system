@@ -1,85 +1,172 @@
-# Content OS — Startup Checklist
+# Content OS — Startup Guide & Environment Manual
 
-Run through this every time after a reboot or a fresh terminal session, in order.
-Each step includes the check to confirm it actually worked before moving to the next.
+Project root: `~/BxTrackSolution/content-os` (`/home/borat/BxTrackSolution/content-os`)
 
-## 1. PostgreSQL
+Run through this procedure every time after a reboot or fresh terminal session.
 
-Check if it's already running (it may auto-start on boot — confirm rather than assume):
+---
+
+## 1. Required Environment
+
+- **OS**: Linux (WSL / Ubuntu)
+- **Python**: Python 3.12 (`/home/borat/BxTrackSolution/content-os/.venv`)
+- **Node.js**: v22+ (`node -v` -> v22.23.2)
+- **PostgreSQL**: PostgreSQL 18 binaries at `/usr/lib/postgresql/18/bin/`
+
+---
+
+## 2. PostgreSQL Architecture & Isolation
+
+⚠️ **IMPORTANT ARCHITECTURAL RULE:**
+There have historically been two PostgreSQL 18 clusters on this system:
+1. **Redundant system cluster**: `/var/lib/postgresql/18/main` (managed by system service, empty database).
+2. **Project-local cluster (REAL)**: `/home/borat/BxTrackSolution/content-os/.pgdata` with Unix domain socket directory `/home/borat/BxTrackSolution/content-os/.pgsockets`.
+
+The Content OS application and LangGraph checkpoints run **strictly and exclusively** on the project-local cluster:
+- **Data directory**: `~/BxTrackSolution/content-os/.pgdata`
+- **Unix socket directory**: `~/BxTrackSolution/content-os/.pgsockets`
+- **Database name**: `contentos_dev`
+- **Port**: 5432 (bound to Unix socket)
+
+Connecting to the wrong instance leads to false reports of data loss or missing tables. The redundant system cluster should remain stopped and not used.
+
+---
+
+## 3. Verified PostgreSQL Startup Command
+
+Check if the project-local PostgreSQL process is already running:
 ```bash
-sudo systemctl status postgresql@18-main --no-pager
+ps -ef | grep "postgres -D.*content-os/.pgdata"
 ```
-Look for `Active: active (running)`. If it's not running:
+
+If it is not running, start it using the verified direct postgres daemon command:
 ```bash
-sudo systemctl start postgresql@18-main
+/usr/lib/postgresql/18/bin/postgres \
+  -D /home/borat/BxTrackSolution/content-os/.pgdata \
+  -k /home/borat/BxTrackSolution/content-os/.pgsockets \
+  -h "" \
+  -p 5432
 ```
+*(Run in a dedicated background task or terminal window).*
 
-**Confirm the app can actually connect** (not just that the service is "active" — this uses
-the real app credentials, same check used throughout this project):
+### PostgreSQL Readiness Verification
+Verify that the project-local cluster is accepting connections on its dedicated socket:
 ```bash
-PGPASSWORD=devpassword psql -h localhost -U contentos -d contentos_dev -c "SELECT current_user, current_database();"
+/usr/lib/postgresql/18/bin/pg_isready -h /home/borat/BxTrackSolution/content-os/.pgsockets -p 5432
 ```
-Expect a row back showing `contentos | contentos_dev`.
+Expected output:
+```
+/home/borat/BxTrackSolution/content-os/.pgsockets:5432 - accepting connections
+```
 
-## 2. Backend (FastAPI)
+---
 
-Open a **dedicated terminal window** for this — it needs to keep running the whole session,
-don't reuse this terminal for other commands.
+## 4. Manual Database Connection & Identity Verification
 
+Always connect directly to the project socket to guarantee targeting the real application database:
+```bash
+psql -h /home/borat/BxTrackSolution/content-os/.pgsockets -U contentos -d contentos_dev
+```
+
+### Optional PGHOST shortcut:
+Add to `~/.bashrc`:
+```bash
+export PGHOST=/home/borat/BxTrackSolution/content-os/.pgsockets
+```
+After `source ~/.bashrc`, a bare `psql -U contentos -d contentos_dev` will default to the project-local socket.
+
+### Database Identity Verification Query
+Run this query to inspect database identity and verify server directory:
+```sql
+SELECT current_database(), current_user, inet_server_addr(), inet_server_port();
+SHOW data_directory;
+SELECT count(*) FROM ideas;
+SELECT count(*) FROM workflow_runs;
+```
+Expected:
+- `current_database`: `contentos_dev`
+- `data_directory`: `/home/borat/BxTrackSolution/content-os/.pgdata`
+- `ideas` count: >= 6
+
+---
+
+## 5. Backend Startup (FastAPI)
+
+Open a dedicated terminal:
 ```bash
 cd ~/BxTrackSolution/content-os/backend
 source ../.venv/bin/activate
-uvicorn app.main:app --reload
+python --version   # Must be 3.12.x
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Confirm the venv activated correctly before trusting uvicorn:
-```bash
-python --version   # should print 3.12.14, not the system default 3.14
-```
-(Run this *before* the `uvicorn` command above, as a quick sanity check.)
+⚠️ Always use standard HTTP on port 8000 (`http://localhost:8000`). Never run with `--uds`.
 
-**In a second terminal**, confirm the backend is actually reachable:
+### Backend Health Verification
 ```bash
 curl http://localhost:8000/health
 curl http://localhost:8000/api/ideas
 ```
-Expect `{"status":"ok"}` and a real JSON list.
+Expected: `{"status":"ok"}` and a JSON array of ideas.
 
-⚠️ Do not start uvicorn with `--uds` (Unix socket) — this project has hit connection
-failures from that before. Always plain `uvicorn app.main:app --reload`, which defaults
-to `http://127.0.0.1:8000`, matching what the frontend expects.
+---
 
-## 3. Frontend (Next.js)
+## 6. Frontend Startup (Next.js)
 
-Another **dedicated terminal window**, separate from the backend one:
+Open a dedicated terminal:
 ```bash
 cd ~/BxTrackSolution/content-os/frontend
-npm run dev
+npm run dev -- -p 3000
 ```
-Open `http://localhost:3000` in a browser once it says `Ready`.
+Open `http://localhost:3000` in the browser. Always port 3000.
 
-## 4. Sanity checks before doing real work
+### Frontend/Backend Connectivity Verification
+- Open `http://localhost:3000/ideas` in your browser.
+- Verify ideas load and render with scores.
+- Check browser devtools console: no CORS errors, no failed API calls.
 
-- `git status` — check nothing unexpected is sitting modified/untracked from a previous
-  session before starting new changes.
-- If using Kiro: confirm the `postgres` and `github` MCP servers show as connected in its
-  MCP panel (Docker Desktop must be running first if using the GitHub MCP server —
-  `docker ps` should return cleanly, not a "cannot connect to daemon" error).
-- If a port is already in use (`Address already in use` on 8000 or 3000), something from a
-  prior session is still running:
+---
+
+## 7. Clean Shutdown Procedure
+
+1. **Frontend**: Stop Next.js process (`Ctrl+C` in the frontend terminal).
+2. **Backend**: Stop uvicorn process (`Ctrl+C` in the backend terminal).
+3. **PostgreSQL**: Stop local postgres cleanly:
+   ```bash
+   /usr/lib/postgresql/18/bin/pg_ctl -D /home/borat/BxTrackSolution/content-os/.pgdata stop
+   ```
+   Or send `SIGTERM` to the root postgres daemon PID recorded in `.pgdata/postmaster.pid`.
+
+---
+
+## 8. Troubleshooting Guide
+
+### Issue: "Database appears empty" or "table does not exist"
+- **Cause**: You connected via TCP `localhost:5432` or default socket to the empty system PostgreSQL instance.
+- **Fix**: Check `DATABASE_URL` in `backend/.env`. Always specify `-h /home/borat/BxTrackSolution/content-os/.pgsockets` when running `psql`.
+
+### Issue: PostgreSQL socket missing
+- **Cause**: Directory `.pgsockets` does not exist or stale socket files are blocking creation.
+- **Fix**: Run `mkdir -p /home/borat/BxTrackSolution/content-os/.pgsockets` and remove stale `.s.PGSQL.*` files before launching.
+
+### Issue: Backend cannot connect (`could not connect to server`)
+- **Cause**: Local PostgreSQL is not running or socket path mismatch.
+- **Fix**: Check `/usr/lib/postgresql/18/bin/pg_isready -h /home/borat/BxTrackSolution/content-os/.pgsockets` and verify `DATABASE_URL` in `backend/.env`.
+
+### Issue: Address already in use (`Errno 98` / `EADDRINUSE`) on port 8000 or 3000
+- **Cause**: Previous uvicorn or Next.js instance is still running in background.
+- **Fix**:
   ```bash
-  lsof -i :8000   # or :3000
-  kill <pid>
+  fuser -k 8000/tcp
+  fuser -k 3000/tcp
   ```
 
-## Quick reference — the three things that must all be true before the app works
+### Issue: Frontend cannot reach backend
+- **Cause**: Backend is down or `NEXT_PUBLIC_API_URL` is pointed to the wrong URL.
+- **Fix**: Ensure `curl http://localhost:8000/health` returns `{"status":"ok"}` and frontend uses `http://localhost:8000/api`.
 
-| Check | Command | Expect |
-|---|---|---|
-| Postgres up | `sudo systemctl status postgresql@18-main --no-pager` | `active (running)` |
-| Backend reachable | `curl http://localhost:8000/health` | `{"status":"ok"}` |
-| Frontend reachable | open `http://localhost:3000` | page loads, no build error |
+---
 
-If any of these three fail, fix that one before assuming the others are the problem —
-this project has repeatedly found that a downstream error (like a frontend build failure)
-often traces back to one of these three not actually being up.
+## 9. Non-Negotiable Safety Rule
+
+> **Never assume a manual database verification command targets the same instance used by the application.** Before trusting manual verification, inspect `backend/.env`'s `DATABASE_URL` and explicitly verify the target host, port, or Unix socket against the running PostgreSQL process.

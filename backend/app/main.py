@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,8 +7,18 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.workflows.routes import router as workflows_router
 from app.ideas.routes import router as ideas_router
+from app.sources.routes import router as sources_router
+from app.publishing.routes import router as publications_router
+from app.ideas.scout_provider import check_api_key_configuration
 
-app = FastAPI(title="Content OS")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    check_api_key_configuration()
+    yield
+
+
+app = FastAPI(title="Content OS", lifespan=lifespan)
 
 # CORS middleware for local frontend development (Next.js default on localhost:3000)
 app.add_middleware(
@@ -15,6 +26,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -23,6 +36,8 @@ app.add_middleware(
 
 app.include_router(workflows_router, prefix="/api")
 app.include_router(ideas_router, prefix="/api")
+app.include_router(sources_router, prefix="/api")
+app.include_router(publications_router, prefix="/api")
 
 
 @app.get("/health")
