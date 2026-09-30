@@ -30,7 +30,7 @@ export interface WorkflowRunResponse {
   id: string;
   idea_id: string;
   strategy_id: string;
-  status: "PENDING" | "RUNNING" | "PAUSED" | "COMPLETED" | "FAILED" | "REJECTED" | "CANCELLED";
+  status: "PENDING" | "RUNNING" | "PAUSED" | "NEEDS_REVIEW" | "PUBLISHING" | "COMPLETED" | "FAILED" | "REJECTED" | "CANCELLED";
   current_phase?: string | null;
   started_at: string;
   resolved_at?: string | null;
@@ -96,5 +96,10 @@ export async function fetchWorkflowRun(id: string): Promise<WorkflowRunResponse>
   if (!res.ok) {
     throw new Error(`Failed to fetch workflow run ${id}: ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  return {
+    ...data,
+    id: data.id || data.workflow_run_id,
+    started_at: data.started_at || data.created_at,
+  };
 }

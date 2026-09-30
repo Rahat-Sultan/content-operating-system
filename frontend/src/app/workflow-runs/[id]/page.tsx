@@ -9,6 +9,8 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   PENDING: "bg-slate-800 text-slate-300 border-slate-700",
   RUNNING: "bg-blue-900/60 text-blue-300 border-blue-700/50 animate-pulse",
   PAUSED: "bg-amber-900/60 text-amber-300 border-amber-700/50",
+  NEEDS_REVIEW: "bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse",
+  PUBLISHING: "bg-indigo-900/60 text-indigo-300 border-indigo-700/50 animate-pulse",
   COMPLETED: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50",
   FAILED: "bg-rose-900/60 text-rose-300 border-rose-700/50",
   REJECTED: "bg-rose-950 text-rose-400 border-rose-800",
@@ -33,8 +35,8 @@ export default function WorkflowRunDetailPage({
     queryFn: () => fetchWorkflowRun(id),
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      // Keep polling every 2.5s while active
-      if (status === "RUNNING" || status === "PENDING" || status === "PAUSED") {
+      // Keep polling while active
+      if (status === "RUNNING" || status === "PENDING" || status === "PAUSED" || status === "PUBLISHING") {
         return 2500;
       }
       return false;
@@ -146,7 +148,7 @@ export default function WorkflowRunDetailPage({
           </div>
         )}
 
-        {run.status === "PAUSED" && (
+        {run.status === "NEEDS_REVIEW" && (
           <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-700/60 text-amber-200 space-y-2">
             <h4 className="text-sm font-semibold text-amber-300">⏸️ Workflow Paused for Approval</h4>
             <p className="text-xs leading-relaxed text-amber-200/90">
