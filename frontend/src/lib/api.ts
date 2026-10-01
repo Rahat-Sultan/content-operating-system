@@ -341,6 +341,22 @@ export async function runStrategyDiscovery(id: string): Promise<StrategyDiscover
   return data;
 }
 
+export interface CreateSourcePayload {
+  name: string;
+  source_type?: string;
+  url?: string | null;
+  enabled?: boolean;
+  config?: Record<string, any>;
+}
+
+export interface UpdateSourcePayload {
+  name?: string;
+  source_type?: string;
+  url?: string | null;
+  enabled?: boolean;
+  config?: Record<string, any>;
+}
+
 export async function fetchSources(): Promise<SourceOption[]> {
   const res = await fetch(`${API_BASE}/sources`);
   if (!res.ok) {
@@ -348,5 +364,32 @@ export async function fetchSources(): Promise<SourceOption[]> {
   }
   return res.json();
 }
+
+export async function createSource(payload: CreateSourcePayload): Promise<SourceOption> {
+  const res = await fetch(`${API_BASE}/sources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to create source");
+  }
+  return data;
+}
+
+export async function updateSource(id: string, payload: UpdateSourcePayload): Promise<SourceOption> {
+  const res = await fetch(`${API_BASE}/sources/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to update source");
+  }
+  return data;
+}
+
 
 

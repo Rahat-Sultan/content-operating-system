@@ -142,6 +142,12 @@ export default function StrategiesPage() {
         </div>
         <nav className="flex items-center space-x-6">
           <Link
+            href="/sources"
+            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Sources
+          </Link>
+          <Link
             href="/strategies"
             className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
           >

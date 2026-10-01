@@ -24,6 +24,53 @@ def get_source(db: Session, source_id: UUID) -> Source:
     return source
 
 
+def create_source(
+    db: Session,
+    name: str,
+    source_type: str = "rss",
+    url: str | None = None,
+    enabled: bool = True,
+    config: dict[str, Any] | None = None,
+) -> Source:
+    source = Source(
+        id=uuid4(),
+        name=name,
+        source_type=source_type,
+        url=url,
+        enabled=enabled,
+        config=config or {},
+    )
+    db.add(source)
+    db.commit()
+    db.refresh(source)
+    return source
+
+
+def update_source(
+    db: Session,
+    source_id: UUID,
+    name: str | None = None,
+    source_type: str | None = None,
+    url: str | None = None,
+    enabled: bool | None = None,
+    config: dict[str, Any] | None = None,
+) -> Source:
+    source = get_source(db, source_id)
+    if name is not None:
+        source.name = name
+    if source_type is not None:
+        source.source_type = source_type
+    if url is not None:
+        source.url = url
+    if enabled is not None:
+        source.enabled = enabled
+    if config is not None:
+        source.config = config
+    db.commit()
+    db.refresh(source)
+    return source
+
+
 def sync_source(db: Session, source_id: UUID) -> dict[str, Any]:
     """
     Ingests source items from a configured source, deduplicates them against source_items,
