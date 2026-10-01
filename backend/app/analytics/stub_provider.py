@@ -64,9 +64,22 @@ def record_stub_analytics(db: Session, publication_id: uuid.UUID, is_initial: bo
         db.commit()
         db.refresh(analytics_row)
         return analytics_row
-    except IntegrityError:
-        # Caught concurrent race inserting initial snapshot
+    except IntegrityError as exc:
         db.rollback()
+
+        # Specifically check if the failure is the uq_initial_analytics_per_publication unique constraint violation
+        is_initial_analytics_violation = False
+        diag = getattr(exc.orig, "diag", None)
+        constraint_name = getattr(diag, "constraint_name", None)
+        if constraint_name == "uq_initial_analytics_per_publication":
+            is_initial_analytics_violation = True
+        elif "uq_initial_analytics_per_publication" in str(exc.orig) or "uq_initial_analytics_per_publication" in str(exc):
+            is_initial_analytics_violation = True
+
+        if not is_initial_analytics_violation:
+            # Re-raise any unrelated database integrity error
+            raise
+
         winner = (
             db.query(Analytics)
             .filter(
