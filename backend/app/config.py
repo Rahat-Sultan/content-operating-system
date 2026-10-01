@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str
     openrouter_api_key: str = ""
     environment: str = "development"
+    publisher_provider: str = "local"
 
 
 settings = Settings()

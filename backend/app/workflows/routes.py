@@ -13,6 +13,7 @@ from app.workflows.schemas import (
     ContentDraftResponse,
     ContentVersionSummary,
 )
+from app.publishing.schemas import PublicationResponse
 from app.workflows.service import (
     create_workflow_run,
     get_workflow_run,
@@ -194,4 +195,39 @@ def read_content_draft(
             for v in versions
         ],
     )
+
+
+@router.get("/{id}/publication", response_model=PublicationResponse)
+def read_workflow_run_publication(
+    id: UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Get the publication record associated with this workflow run.
+    """
+    from app.content.models import Content, ContentVersion
+    from app.publishing.models import Publication
+    from fastapi import HTTPException, status
+
+    content = db.query(Content).filter(Content.workflow_run_id == id).first()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No content found for workflow run {id}."
+        )
+
+    version_ids = [v.id for v in db.query(ContentVersion.id).filter(ContentVersion.content_id == content.id).all()]
+    publication = (
+        db.query(Publication)
+        .filter(Publication.content_version_id.in_(version_ids))
+        .order_by(Publication.created_at.desc())
+        .first()
+    )
+    if not publication:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No publication found for workflow run {id}."
+        )
+
+    return publication
 

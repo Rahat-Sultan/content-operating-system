@@ -163,3 +163,38 @@ workflow_runs.status
 ```
 
 Graph state may contain the working error context, but PostgreSQL remains the durable source of truth.
+
+---
+
+## 10. Publishing Lifecycle & Idempotency Boundary
+
+The system isolates external publishing providers behind a strict boundary:
+
+```text
+Publisher Node (LangGraph)
+        ↓
+PublishingService
+        ↓
+PublisherInterface
+        ↓
+Concrete Provider (LocalTestPublisher / LinkedInProvider / etc.)
+```
+
+### Publication State Machine
+
+```text
+PENDING / (start)
+   ↓
+PUBLISHING (atomic status update)
+   ↓
+[Provider dispatch with deterministic idempotency_key]
+   ├── SUCCESS → PUBLISHED (external_id, published_at, analytics snapshot recorded)
+   ├── TRANSIENT ERROR → Bounded retry reusing same idempotency_key
+   ├── PERMANENT ERROR → FAILED (immediate halt, error recorded)
+   └── AMBIGUOUS TIMEOUT → FAILED (retries halted to prevent duplicate post, ambiguous outcome noted)
+```
+
+### Concurrency & Version Safety
+1. **Deterministic Idempotency Key**: `f"{content_version_id}:{platform}"` (retries MUST reuse the same key).
+2. **PostgreSQL Protection**: `UNIQUE(idempotency_key)` protects against concurrent dispatch races. If two workers invoke publish concurrently, the unique constraint ensures only one row is created; the secondary caller gracefully receives and returns the winning publication.
+3. **Version Lock**: Publishing strictly verifies that `ContentVersion` belongs to the `WorkflowRun`, has status `APPROVED`, and matches the latest version. Stale or rejected versions can never publish.

@@ -200,3 +200,26 @@ export async function submitApprovalDecision(
   }
   return data;
 }
+
+export interface PublicationResponse {
+  id: string;
+  content_version_id: string;
+  platform: string;
+  status: "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED";
+  idempotency_key: string;
+  external_id?: string | null;
+  url?: string | null;
+  publication_metadata: Record<string, any>;
+  error?: string | null;
+  created_at: string;
+  published_at?: string | null;
+}
+
+export async function fetchWorkflowRunPublication(id: string): Promise<PublicationResponse> {
+  const res = await fetch(`${API_BASE}/workflow-runs/${id}/publication`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch publication for workflow run ${id}: ${res.statusText}`);
+  }
+  return res.json();
+}
+

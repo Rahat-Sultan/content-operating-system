@@ -100,6 +100,7 @@ Manual edits create new versions.
 ```http
 GET /api/publications/{id}
 GET /api/publications/{id}/analytics
+GET /api/workflow-runs/{id}/publication
 ```
 
 ---

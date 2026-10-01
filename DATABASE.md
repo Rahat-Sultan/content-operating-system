@@ -160,11 +160,22 @@ The API should reject stale approval requests with a conflict response.
 
 ---
 
-## 11. Publishing Idempotency
+## 11. Publishing Idempotency & Unique Constraint
 
-Publication records should contain an idempotency key.
+Publication records contain a deterministic idempotency key:
 
-This prevents duplicate external publications when a platform accepts a request but the network fails before the application receives the response.
+```sql
+idempotency_key TEXT NOT NULL UNIQUE
+```
+
+Key format: `f"{content_version_id}:{platform}"`
+
+Constraints and behaviors:
+* `UNIQUE (idempotency_key)` protects against concurrent duplicate publication attempts at the database level.
+* Status progression: `PENDING` → `PUBLISHING` → `PUBLISHED` (or `FAILED`).
+* Foreign Key: `content_version_id REFERENCES content_versions(id) ON DELETE CASCADE`.
+* Immutable ContentVersion provenance: Only the approved version associated with the WorkflowRun can be published.
+* On concurrent insert conflict, the database rejects the duplicate with `UniqueViolation` and the application safely recovers and returns the winning record.
 
 ---
 

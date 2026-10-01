@@ -10,6 +10,7 @@ import {
   fetchWorkflowRunBrief,
   fetchWorkflowRunDraft,
   submitApprovalDecision,
+  fetchWorkflowRunPublication,
 } from "@/lib/api";
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -92,6 +93,20 @@ export default function WorkflowRunDetailPage({
     retry: false,
   });
 
+  // 6. Publication Information
+  const { data: publication } = useQuery({
+    queryKey: ["workflow-run-publication", id],
+    queryFn: () => fetchWorkflowRunPublication(id),
+    enabled: !!run && (run.status === "COMPLETED" || run.status === "PUBLISHING" || run.status === "FAILED"),
+    refetchInterval: (query) => {
+      if (run?.status === "PUBLISHING") {
+        return 2000;
+      }
+      return false;
+    },
+    retry: false,
+  });
+
   // Approval Mutation
   const approvalMutation = useMutation({
     mutationFn: async ({
@@ -116,6 +131,7 @@ export default function WorkflowRunDetailPage({
       setFeedback("");
       queryClient.invalidateQueries({ queryKey: ["workflow-run", id] });
       queryClient.invalidateQueries({ queryKey: ["workflow-run-draft", id] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-run-publication", id] });
       refetch();
       refetchDraft();
     },
@@ -303,6 +319,72 @@ export default function WorkflowRunDetailPage({
                   <div className="h-3.5 w-3.5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
                   <span>Submitting decision & resuming graph...</span>
                 </span>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Publication Information Section */}
+        {publication && (
+          <section className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Publication Dispatch Status
+              </h2>
+              <span className={`px-2.5 py-0.5 rounded text-[11px] font-semibold border ${STATUS_BADGE_STYLES[publication.status] || "bg-slate-800 text-slate-300 border-slate-700"}`}>
+                {publication.status}
+              </span>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3 shadow">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                    Platform
+                  </span>
+                  <span className="text-slate-200 capitalize font-medium">{publication.platform}</span>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                    External Post ID
+                  </span>
+                  <span className="text-slate-200 font-mono text-[11px] truncate block" title={publication.external_id || "None"}>
+                    {publication.external_id || "—"}
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                    Idempotency Key
+                  </span>
+                  <span className="text-slate-300 font-mono text-[11px] truncate block" title={publication.idempotency_key}>
+                    {publication.idempotency_key}
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                    Published At
+                  </span>
+                  <span className="text-emerald-400 font-medium">
+                    {publication.published_at ? new Date(publication.published_at).toLocaleString() : "—"}
+                  </span>
+                </div>
+              </div>
+              {publication.url && (
+                <div className="pt-1 flex items-center space-x-2 text-xs">
+                  <span className="text-slate-400">Post URL:</span>
+                  <a
+                    href={publication.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-400 hover:text-indigo-300 underline font-mono truncate"
+                  >
+                    {publication.url}
+                  </a>
+                </div>
+              )}
+              {publication.error && (
+                <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs font-mono">
+                  {publication.error}
+                </div>
               )}
             </div>
           </section>
