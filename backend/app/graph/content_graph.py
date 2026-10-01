@@ -34,12 +34,14 @@ def build_content_graph():
     """
     builder = StateGraph(ContentGraphState)
 
-    # Attach nodes
+    # Attach nodes with transient retry policies for external LLM calls
     research_retry = RetryPolicy(max_attempts=2)
+    brief_retry = RetryPolicy(max_attempts=2)
+    writer_retry = RetryPolicy(max_attempts=2)
+
     builder.add_node("research", research_node, retry_policy=research_retry)
-    # No RetryPolicy yet on brief/writer — stubs have no external call; add when real LLM provider is wired in
-    builder.add_node("brief", brief_node)
-    builder.add_node("writer", writer_node)
+    builder.add_node("brief", brief_node, retry_policy=brief_retry)
+    builder.add_node("writer", writer_node, retry_policy=writer_retry)
     builder.add_node("approval", approval_node)
     builder.add_node("publisher", publisher_node)
 

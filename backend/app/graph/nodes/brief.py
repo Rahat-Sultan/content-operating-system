@@ -6,7 +6,7 @@ from app.db import SessionLocal
 from app.graph.state import ContentGraphState
 from app.ideas.models import Idea
 from app.workflows.models import ContentBrief, Research, WorkflowRun, WorkflowRunStatus
-from app.workflows.brief_provider import execute_brief_generation
+from app.workflows.brief_provider import execute_brief_for_idea, execute_brief_generation
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 def brief_node(state: ContentGraphState) -> dict:
     """
     Strategist / Content Brief node:
-    - Reads research_id and idea_id from graph state.
-    - Loads the Research record and Idea from Postgres.
-    - Calls the brief provider stub.
+    - Reads research_id, idea_id, and strategy_id from graph state.
+    - Loads the Research record, Idea, and Strategy from Postgres.
+    - Calls the brief provider to synthesize a structured editorial brief.
     - Persists a new row in content_briefs table.
     - Returns {"content_brief_id": brief_record.id}.
     - On failure, updates workflow_runs.status = 'FAILED' and raises exc.
@@ -24,19 +24,17 @@ def brief_node(state: ContentGraphState) -> dict:
     workflow_run_id = state["workflow_run_id"]
     research_id = state.get("research_id")
     idea_id = state["idea_id"]
+    strategy_id = state["strategy_id"]
 
     db = SessionLocal()
     try:
-        idea = db.query(Idea).filter(Idea.id == idea_id).first()
-        topic = idea.title if idea else "Untitled Topic"
-
-        research = None
-        if research_id:
-            research = db.query(Research).filter(Research.id == research_id).first()
-        research_summary = research.summary if research else None
-
-        # Call brief generator stub
-        brief_data = execute_brief_generation(query=topic, research_summary=research_summary)
+        # Call real brief generator with Strategy and Research
+        brief_data, _prompt, _raw_resp = execute_brief_for_idea(
+            db=db,
+            idea_id=idea_id,
+            strategy_id=strategy_id,
+            research_id=research_id,
+        )
 
         # Persist content_briefs row (one per workflow run)
         brief_record = db.query(ContentBrief).filter(ContentBrief.workflow_run_id == workflow_run_id).first()

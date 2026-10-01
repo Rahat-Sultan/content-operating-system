@@ -6,6 +6,7 @@ from app.db import SessionLocal
 from app.graph.state import ContentGraphState
 from app.workflows.models import ContentBrief, WorkflowRun, WorkflowRunStatus
 from app.content.models import Content, ContentVersion, ContentVersionOrigin
+from app.workflows.writer_provider import execute_writer_generation
 
 logger = logging.getLogger(__name__)
 
@@ -13,17 +14,21 @@ logger = logging.getLogger(__name__)
 def writer_node(state: ContentGraphState) -> dict:
     """
     Writer node:
-    - Reads content_brief_id from graph state.
-    - Loads ContentBrief from Postgres.
+    - Reads content_brief_id, research_id, idea_id, strategy_id from graph state.
+    - Loads ContentBrief and Strategy from Postgres.
     - Determines version number:
       If content row exists, version_number = max(existing_versions) + 1.
       Otherwise, creates new content row with version_number = 1.
+    - Calls execute_writer_generation with approval_feedback (if revision) and inputs.
     - Inserts a new immutable ContentVersion row with origin=WRITER_AGENT.
     - Updates WorkflowRun status to NEEDS_REVIEW when ready for human review.
     - Returns {"content_id": ..., "current_content_version_id": ...}.
     """
     workflow_run_id = state["workflow_run_id"]
     content_brief_id = state.get("content_brief_id")
+    research_id = state.get("research_id")
+    idea_id = state["idea_id"]
+    strategy_id = state["strategy_id"]
     approval_feedback = state.get("approval_feedback")
 
     db = SessionLocal()
@@ -62,18 +67,15 @@ def writer_node(state: ContentGraphState) -> dict:
         if version_number > 1 and approval_feedback:
             revision_clause = f"\n\n### Revision Notes Incorporated:\n* Reviewer feedback addressed: '{approval_feedback}'"
 
-        draft_title = f"Architectural Overview: {angle}"
-        draft_body = (
-            f"# {draft_title}\n\n"
-            f"> **STUB DRAFT (v{version_number})** — Generated for {target_audience}.\n\n"
-            f"**Hook:** {hook}\n\n"
-            f"## Overview\n"
-            f"This draft demonstrates durable state management in content production pipelines. "
-            f"State is checkpointed durably in PostgreSQL to survive process termination.{revision_clause}\n\n"
-            f"## Actionable Takeaways\n"
-            f"- Verify database invariants before code execution.\n"
-            f"- Keep graph state small and store domain entities in primary tables.\n"
-            f"- Human approval is an explicit interrupt boundary.\n"
+        # 2. Generate real draft content via Writer provider
+        draft_title, draft_body, _prompt, _used_model, _is_fallback = execute_writer_generation(
+            db=db,
+            idea_id=idea_id,
+            strategy_id=strategy_id,
+            research_id=research_id,
+            content_brief_id=content_brief_id,
+            version_number=version_number,
+            approval_feedback=approval_feedback,
         )
 
         # 3. Insert immutable ContentVersion

@@ -6,7 +6,7 @@ from app.db import SessionLocal
 from app.graph.state import ContentGraphState
 from app.ideas.models import Idea
 from app.workflows.models import Research, WorkflowRun, WorkflowRunStatus
-from app.workflows.research_provider import execute_research_query
+from app.workflows.research_provider import execute_research_for_idea, execute_research_query
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +35,24 @@ def research_node(state: ContentGraphState) -> dict:
         if idea.description:
             query = f"{idea.title} - {idea.description}"
 
-        # Call research provider
-        results = execute_research_query(query)
+        # Call real research provider grounded in source items
+        results, _prompt, _raw_resp = execute_research_for_idea(db, idea_id)
 
-        # Persist research artifact
-        research_record = Research(
-            id=uuid4(),
-            workflow_run_id=workflow_run_id,
-            summary=results.get("summary"),
-            findings=results.get("findings", {}),
-            sources=results.get("sources", {}),
-        )
-        db.add(research_record)
+        # Persist research artifact (or update if retrying)
+        research_record = db.query(Research).filter(Research.workflow_run_id == workflow_run_id).first()
+        if not research_record:
+            research_record = Research(
+                id=uuid4(),
+                workflow_run_id=workflow_run_id,
+                summary=results.get("summary"),
+                findings=results.get("findings", {}),
+                sources=results.get("sources", {}),
+            )
+            db.add(research_record)
+        else:
+            research_record.summary = results.get("summary")
+            research_record.findings = results.get("findings", {})
+            research_record.sources = results.get("sources", {})
 
         # Update WorkflowRun status to RUNNING if it was PENDING
         run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
