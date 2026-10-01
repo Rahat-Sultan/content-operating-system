@@ -29,6 +29,7 @@ POST /api/strategies
 GET /api/strategies
 GET /api/strategies/{id}
 PATCH /api/strategies/{id}
+POST /api/strategies/{id}/discover
 ```
 
 ---

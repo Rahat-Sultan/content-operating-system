@@ -21,6 +21,25 @@ def sync_source_endpoint(
     return sync_source(db=db, source_id=id)
 
 
+@router.get("", response_model=list[dict[str, Any]])
+def list_sources_endpoint(
+    db: Session = Depends(get_db),
+):
+    from app.sources.models import Source
+    sources = db.query(Source).order_by(Source.name.asc()).all()
+    return [
+        {
+            "id": str(s.id),
+            "name": s.name,
+            "source_type": s.source_type,
+            "url": s.url,
+            "enabled": s.enabled,
+            "config": s.config,
+        }
+        for s in sources
+    ]
+
+
 @router.get("/{id}")
 def get_source_endpoint(
     id: UUID,
@@ -35,3 +54,4 @@ def get_source_endpoint(
         "enabled": source.enabled,
         "config": source.config,
     }
+

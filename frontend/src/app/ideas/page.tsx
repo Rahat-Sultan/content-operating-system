@@ -51,7 +51,13 @@ export default function IdeasPage() {
             <p className="text-xs text-slate-400">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
-        <nav className="flex items-center space-x-4">
+        <nav className="flex items-center space-x-6">
+          <Link
+            href="/strategies"
+            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Strategies
+          </Link>
           <Link
             href="/ideas"
             className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"

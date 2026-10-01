@@ -9,6 +9,7 @@ from app.workflows.routes import router as workflows_router
 from app.ideas.routes import router as ideas_router
 from app.sources.routes import router as sources_router
 from app.publishing.routes import router as publications_router
+from app.strategies.routes import router as strategies_router
 from app.ideas.scout_provider import check_api_key_configuration
 
 
@@ -38,6 +39,8 @@ app.include_router(workflows_router, prefix="/api")
 app.include_router(ideas_router, prefix="/api")
 app.include_router(sources_router, prefix="/api")
 app.include_router(publications_router, prefix="/api")
+app.include_router(strategies_router, prefix="/api")
+
 
 
 @app.get("/health")

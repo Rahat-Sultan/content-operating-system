@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, func
+from sqlalchemy import DateTime, ForeignKey, Index, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -12,6 +12,9 @@ class Analytics(Base):
     """
     Performance snapshot for a publication.
     Multiple rows per publication are allowed — supports historical snapshots over time.
+    Partial unique index uq_initial_analytics_per_publication ensures only ONE initial
+    snapshot (metrics->>'is_initial' = 'true') can exist per publication, preventing
+    concurrent publish-time race duplicates.
     """
     __tablename__ = "analytics"
 
@@ -29,4 +32,12 @@ class Analytics(Base):
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    # No cross-domain relationships — use service layer to join across domains
+
+    __table_args__ = (
+        Index(
+            "uq_initial_analytics_per_publication",
+            "publication_id",
+            unique=True,
+            postgresql_where=text("((metrics->>'is_initial')::boolean IS TRUE)"),
+        ),
+    )

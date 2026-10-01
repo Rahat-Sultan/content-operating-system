@@ -223,3 +223,130 @@ export async function fetchWorkflowRunPublication(id: string): Promise<Publicati
   return res.json();
 }
 
+export interface StrategySourceSummary {
+  id: string;
+  name: string;
+  source_type: string;
+  url?: string | null;
+  enabled: boolean;
+}
+
+export interface StrategyItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  config: {
+    niche?: string;
+    audience?: string;
+    goals?: string[];
+    platforms?: string[];
+    content_types?: string[];
+    topics?: string[];
+    tone?: string;
+    voice_guidelines?: string;
+    [key: string]: any;
+  };
+  enabled: boolean;
+  sources: StrategySourceSummary[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStrategyPayload {
+  name: string;
+  description?: string;
+  config?: Record<string, any>;
+  enabled?: boolean;
+  source_ids?: string[];
+}
+
+export interface UpdateStrategyPayload {
+  name?: string;
+  description?: string;
+  config?: Record<string, any>;
+  enabled?: boolean;
+  source_ids?: string[];
+}
+
+export interface StrategyDiscoveryResult {
+  strategy_id: string;
+  strategy_name: string;
+  sources_synced: number;
+  items_fetched: number;
+  new_items_count: number;
+  ideas_created_count: number;
+  created_idea_ids: string[];
+}
+
+export interface SourceOption {
+  id: string;
+  name: string;
+  source_type: string;
+  url?: string | null;
+  enabled: boolean;
+  config?: Record<string, any>;
+}
+
+export async function fetchStrategies(enabledOnly = false): Promise<StrategyItem[]> {
+  const url = `${API_BASE}/strategies${enabledOnly ? "?enabled_only=true" : ""}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch strategies: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function fetchStrategy(id: string): Promise<StrategyItem> {
+  const res = await fetch(`${API_BASE}/strategies/${id}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch strategy ${id}: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function createStrategy(payload: CreateStrategyPayload): Promise<StrategyItem> {
+  const res = await fetch(`${API_BASE}/strategies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to create strategy");
+  }
+  return data;
+}
+
+export async function updateStrategy(id: string, payload: UpdateStrategyPayload): Promise<StrategyItem> {
+  const res = await fetch(`${API_BASE}/strategies/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to update strategy");
+  }
+  return data;
+}
+
+export async function runStrategyDiscovery(id: string): Promise<StrategyDiscoveryResult> {
+  const res = await fetch(`${API_BASE}/strategies/${id}/discover`, {
+    method: "POST",
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to run strategy discovery");
+  }
+  return data;
+}
+
+export async function fetchSources(): Promise<SourceOption[]> {
+  const res = await fetch(`${API_BASE}/sources`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch sources: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+

@@ -179,6 +179,20 @@ Constraints and behaviors:
 
 ---
 
+## 12. Initial Analytics Snapshot Concurrency
+
+To prevent duplicate publish-time initial analytics records without breaking historical analytics snapshots:
+* A partial unique index is enforced on `analytics`:
+  ```sql
+  CREATE UNIQUE INDEX uq_initial_analytics_per_publication
+  ON analytics (publication_id)
+  WHERE ((metrics->>'is_initial')::boolean IS TRUE);
+  ```
+* Global `UNIQUE(publication_id)` is explicitly prohibited because subsequent analytics polls over time must append periodic performance snapshots to the table.
+* On concurrent publish races, only one thread can insert the initial snapshot with `is_initial = True`. Conflicting inserts catch the `IntegrityError` and query the winning snapshot row.
+
+---
+
 ## 12. JSONB
 
 JSONB is appropriate for flexible structures such as:

@@ -20,6 +20,7 @@ from app.ideas.models import Idea  # noqa: F401
 from app.content.models import Approval, ApprovalStatus, Content, ContentVersion, ContentVersionOrigin
 from app.workflows.models import WorkflowRun, WorkflowRunStatus
 from app.publishing.models import Publication, PublicationStatus
+from app.analytics.models import Analytics
 from app.publishing.service import PublishingService, build_idempotency_key
 from app.publishing.local_provider import LocalTestPublisher
 from app.publishing.interface import (
@@ -144,12 +145,19 @@ def test_1_concurrent_publication_attempts():
     verify_db: Session = SessionLocal()
     key = build_idempotency_key(v1.id, "linkedin")
     pubs = verify_db.query(Publication).filter(Publication.idempotency_key == key).all()
+    analytics_count = (
+        verify_db.query(Analytics)
+        .filter(Analytics.publication_id == pubs[0].id)
+        .count()
+    ) if pubs else 0
     verify_db.close()
 
     assert len(pubs) == 1, f"Expected exactly 1 publication row in DB, got {len(pubs)}"
     assert len(results) == 2, f"Both callers should receive the publication record, got {len(results)}"
     assert results[0] == results[1], f"Both callers should receive identical publication ID: {results}"
-    print(f"✓ TEST 1 PASSED: Exactly 1 publication created ({pubs[0].id}) despite 2 concurrent threads.")
+    assert analytics_count == 1, f"Expected exactly 1 initial analytics snapshot row, got {analytics_count}"
+    print(f"✓ TEST 1 PASSED: Exactly 1 publication created ({pubs[0].id}) and exactly 1 initial analytics snapshot despite 2 concurrent threads.")
+
 
 
 def test_2_repeated_publication_request():
