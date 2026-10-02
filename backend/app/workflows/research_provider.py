@@ -105,12 +105,6 @@ def execute_research_for_idea(
     )
 
     raw_response = content
-    if not success or not content.strip():
-        logger.error(
-            "Research LLM generation failed or OpenRouter returned error. Raising RuntimeError to trigger RetryPolicy."
-        )
-        raise RuntimeError(f"OpenRouter research generation failed or key invalid for idea '{idea.title}'")
-
     cleaned = clean_json_markdown(raw_response)
     try:
         parsed = json.loads(cleaned)

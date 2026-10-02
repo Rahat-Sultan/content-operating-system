@@ -13,6 +13,33 @@ SECONDARY_MODEL = "google/gemma-4-26b-a4b-it:free"
 FALLBACK_MODEL = "openrouter/free"
 
 
+class OpenRouterError(Exception):
+    """Base exception for OpenRouter operations."""
+    pass
+
+
+class OpenRouterAuthError(OpenRouterError):
+    """401/403 or missing/placeholder API key. Non-retryable."""
+    pass
+
+
+class OpenRouterRateLimitError(OpenRouterError):
+    """429 Rate limit encountered. Transient, respect Retry-After if present."""
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+class OpenRouterTransientError(OpenRouterError):
+    """500, 502, 503, 504, 408, network timeouts, DNS resolution failure. Retryable."""
+    pass
+
+
+class OpenRouterRequestError(OpenRouterError):
+    """400 Bad Request, 404 Model Not Found, malformed payload. Non-retryable."""
+    pass
+
+
 def is_placeholder_key(key: str | None) -> bool:
     """Check if the API key is missing, empty, or set to the default placeholder."""
     if not key or not key.strip():
@@ -28,7 +55,7 @@ def check_api_key_configuration(operation_name: str = "LLM Generation") -> bool:
             "\n"
             "====================================================================\n"
             f"⚠️  WARNING: OPENROUTER_API_KEY is not configured or is a placeholder!\n"
-            f"   {operation_name} will run in FALLBACK MODE (is_fallback: true).\n"
+            f"   {operation_name} will fail or require fallback.\n"
             "   To enable live LLM generation, provide a valid OpenRouter API key.\n"
             "====================================================================\n"
         )
@@ -43,12 +70,15 @@ def call_openrouter_api(
     user_prompt: str,
     response_format: dict[str, str] | None = None,
     temperature: float = 0.2,
-    timeout: float = 40.0,
-) -> tuple[bool, str]:
+    timeout: float = 25.0,
+) -> str:
     """
-    Call OpenRouter chat completions endpoint.
-    Returns (success, response_content_string).
+    Call OpenRouter chat completions endpoint with classified exceptions.
+    Returns response content string on success, or raises classified OpenRouterError.
     """
+    if is_placeholder_key(api_key):
+        raise OpenRouterAuthError("OpenRouter API key is missing, empty, or placeholder.")
+
     headers = {
         "Authorization": f"Bearer {api_key.strip()}",
         "Content-Type": "application/json",
@@ -64,27 +94,62 @@ def call_openrouter_api(
     if response_format:
         payload["response_format"] = response_format
 
-    with httpx.Client(timeout=timeout) as client:
-        res = client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        if res.status_code != 200:
-            logger.warning(
-                "OpenRouter model %s returned status %d: %s",
-                model,
-                res.status_code,
-                res.text[:200],
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            res = client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
             )
-            return False, ""
-        data = res.json()
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.WriteTimeout, httpx.NetworkError) as net_err:
+        err_type = type(net_err).__name__
+        logger.warning("OpenRouter network failure for model %s: %s: %s", model, err_type, net_err)
+        raise OpenRouterTransientError(f"Network failure calling OpenRouter ({err_type}): {net_err}") from net_err
+
+    status_code = res.status_code
+    if status_code == 200:
+        try:
+            data = res.json()
+        except Exception as json_err:
+            raise OpenRouterTransientError(f"Malformed JSON response from OpenRouter: {json_err}") from json_err
+
         choices = data.get("choices") or []
         if not choices:
-            logger.warning("OpenRouter model %s returned no choices: %s", model, str(data)[:200])
-            return False, ""
+            raise OpenRouterTransientError(f"OpenRouter model {model} returned 200 OK with no choices in payload")
         content = choices[0].get("message", {}).get("content", "")
-        return True, content
+        if not content:
+            raise OpenRouterTransientError(f"OpenRouter model {model} returned 200 OK with empty content")
+        return content
+
+    # Error classification based on HTTP status
+    err_body = res.text[:300].strip()
+    if status_code in (401, 403):
+        raise OpenRouterAuthError(f"OpenRouter authentication failed (HTTP {status_code}) for model {model}: {err_body}")
+
+    if status_code == 429:
+        retry_after_hdr = res.headers.get("Retry-After")
+        retry_after_val: float | None = None
+        if retry_after_hdr:
+            try:
+                retry_after_val = float(retry_after_hdr)
+            except ValueError:
+                pass
+        raise OpenRouterRateLimitError(
+            f"OpenRouter rate limit reached (HTTP 429) for model {model}: {err_body}",
+            retry_after=retry_after_val,
+        )
+
+    if status_code in (408, 500, 502, 503, 504):
+        raise OpenRouterTransientError(
+            f"OpenRouter upstream service error (HTTP {status_code}) for model {model}: {err_body}"
+        )
+
+    if status_code in (400, 404, 422):
+        raise OpenRouterRequestError(
+            f"OpenRouter request error (HTTP {status_code}) for model {model}: {err_body}"
+        )
+
+    raise OpenRouterError(f"OpenRouter unexpected HTTP {status_code} for model {model}: {err_body}")
 
 
 def execute_llm_completion(
@@ -95,73 +160,64 @@ def execute_llm_completion(
     temperature: float = 0.2,
 ) -> tuple[bool, str, str | None, bool]:
     """
-    Standard OpenRouter calling chain with Primary -> Fallback -> Failure.
+    Standard OpenRouter calling chain with Primary -> Secondary -> Fallback.
     Returns: (success, raw_content, used_model, is_fallback)
-    
-    If the key is invalid or all models fail:
-    returns (False, "", None, True)
+
+    If all models fail or key is invalid:
+    Raises the most informative classified OpenRouterError describing all attempted models and failures.
     """
     api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
-    is_valid_key = not is_placeholder_key(api_key)
-
-    if not is_valid_key:
+    if is_placeholder_key(api_key):
         check_api_key_configuration(operation_name)
-        return False, "", None, True
-
-    # 1. Try Primary Model
-    logger.info("[%s] Calling OpenRouter Primary Model: %s", operation_name, PRIMARY_MODEL)
-    try:
-        success, content = call_openrouter_api(
-            api_key=api_key,
-            model=PRIMARY_MODEL,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            response_format=response_format,
-            temperature=temperature,
-            timeout=15.0,
+        raise OpenRouterAuthError(
+            f"[{operation_name}] OPENROUTER_API_KEY is not configured or is a placeholder. Live LLM generation cannot run."
         )
-        if success and content.strip():
-            return True, content, PRIMARY_MODEL, False
-    except Exception as e:
-        logger.warning("[%s] Primary model %s failed: %s", operation_name, PRIMARY_MODEL, e)
 
-    # 2. Try Secondary Model
-    logger.info("[%s] Calling OpenRouter Secondary Model: %s", operation_name, SECONDARY_MODEL)
-    try:
-        success, content = call_openrouter_api(
-            api_key=api_key,
-            model=SECONDARY_MODEL,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            response_format=response_format,
-            temperature=temperature,
-            timeout=15.0,
-        )
-        if success and content.strip():
-            return True, content, SECONDARY_MODEL, False
-    except Exception as e:
-        logger.warning("[%s] Secondary model %s failed: %s", operation_name, SECONDARY_MODEL, e)
+    models_chain = [
+        ("primary", PRIMARY_MODEL),
+        ("secondary", SECONDARY_MODEL),
+        ("fallback", FALLBACK_MODEL),
+    ]
 
-    # 3. Try Fallback Model
-    logger.info("[%s] Falling back to OpenRouter model: %s", operation_name, FALLBACK_MODEL)
-    try:
-        success, content = call_openrouter_api(
-            api_key=api_key,
-            model=FALLBACK_MODEL,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            response_format=response_format,
-            temperature=temperature,
-            timeout=15.0,
-        )
-        if success and content.strip():
-            return True, content, FALLBACK_MODEL, False
-    except Exception as e:
-        logger.warning("[%s] Fallback model %s failed: %s", operation_name, FALLBACK_MODEL, e)
+    attempt_errors: list[str] = []
 
-    # Both failed
-    check_api_key_configuration(operation_name)
-    return False, "", None, True
+    for stage, model in models_chain:
+        logger.info("[%s] Attempting %s model: %s", operation_name, stage, model)
+        try:
+            content = call_openrouter_api(
+                api_key=api_key,
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                response_format=response_format,
+                temperature=temperature,
+                timeout=25.0,
+            )
+            is_fallback = (stage != "primary")
+            logger.info("[%s] Succeeded using %s model: %s", operation_name, stage, model)
+            return True, content, model, is_fallback
+        except OpenRouterAuthError as auth_err:
+            # Auth errors are not model-specific, halt immediately without trying other models
+            logger.error("[%s] Non-retryable auth error on model %s: %s", operation_name, model, auth_err)
+            raise
+        except OpenRouterRequestError as req_err:
+            logger.warning("[%s] Non-retryable request error on model %s: %s", operation_name, model, req_err)
+            attempt_errors.append(f"{model} (HTTP Request Error: {req_err})")
+            # Proceed to next model in fallback chain
+        except OpenRouterRateLimitError as rate_err:
+            logger.warning("[%s] Rate limit on model %s: %s", operation_name, model, rate_err)
+            attempt_errors.append(f"{model} (Rate Limit 429: {rate_err})")
+        except OpenRouterTransientError as trans_err:
+            logger.warning("[%s] Transient error on model %s: %s", operation_name, model, trans_err)
+            attempt_errors.append(f"{model} (Transient/Network: {trans_err})")
+        except Exception as unk_err:
+            logger.warning("[%s] Unexpected error on model %s: %s", operation_name, model, unk_err)
+            attempt_errors.append(f"{model} ({type(unk_err).__name__}: {unk_err})")
+
+    # All models failed in the chain
+    summary_msg = f"[{operation_name}] All models in fallback chain failed: " + "; ".join(attempt_errors)
+    logger.error(summary_msg)
+    raise OpenRouterTransientError(summary_msg)
 
 
 def clean_json_markdown(text: str) -> str:

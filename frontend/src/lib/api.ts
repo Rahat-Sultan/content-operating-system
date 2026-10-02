@@ -122,11 +122,16 @@ export async function startWorkflowRun(ideaId: string, strategyId: string): Prom
   const data = await res.json();
 
   if (!res.ok) {
-    // Pass detail from backend error response (e.g. 409 detail)
-    const message = data.detail || `Request failed with status ${res.status}`;
-    const error = new Error(message) as Error & { status?: number; data?: any };
+    let message = `Request failed with status ${res.status}`;
+    if (typeof data.detail === "string") {
+      message = data.detail;
+    } else if (data.detail && typeof data.detail === "object") {
+      message = data.detail.message || JSON.stringify(data.detail);
+    }
+    const error = new Error(message) as Error & { status?: number; data?: any; detail?: any };
     error.status = res.status;
     error.data = data;
+    error.detail = data.detail;
     throw error;
   }
 

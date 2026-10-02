@@ -53,7 +53,13 @@ export default function IdeaDetailPage({
   const { id } = use(params);
   const router = useRouter();
 
-  const [conflictError, setConflictError] = useState<string | null>(null);
+  interface ConflictInfo {
+    message: string;
+    workflow_run_id?: string;
+    status?: string;
+  }
+
+  const [conflict, setConflict] = useState<ConflictInfo | null>(null);
 
   const {
     data: idea,
@@ -79,15 +85,36 @@ export default function IdeaDetailPage({
       return startWorkflowRun(idea.id, idea.strategy_id);
     },
     onSuccess: (data) => {
-      setConflictError(null);
+      setConflict(null);
       const targetId = data.workflow_run_id || data.id;
       router.push(`/workflow-runs/${targetId}`);
     },
     onError: (err: any) => {
-      if (err.status === 409 || err.message?.includes("Active workflow run already exists")) {
-        setConflictError(err.message);
+      if (err.status === 409 || err.detail?.code === "ACTIVE_WORKFLOW_EXISTS" || err.message?.toLowerCase().includes("active workflow")) {
+        const detail = (typeof err.detail === "object" && err.detail !== null) ? err.detail : {};
+        let runId = detail.workflow_run_id;
+        let runStatus = detail.status;
+
+        // Fallback: if backend returned a string detail with UUID (legacy/stale backend response)
+        const msgStr = typeof err.detail === "string" ? err.detail : (err.message || "");
+        if (!runId) {
+          const uuidMatch = msgStr.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+          if (uuidMatch) runId = uuidMatch[1];
+        }
+        if (!runStatus) {
+          const statusMatch = msgStr.match(/status ['"]?([A-Z_]+)['"]?/i);
+          if (statusMatch) runStatus = statusMatch[1];
+        }
+
+        setConflict({
+          message: detail.message || msgStr || "An active workflow already exists for this idea.",
+          workflow_run_id: runId,
+          status: runStatus,
+        });
       } else {
-        setConflictError(err.message || "Failed to start workflow run.");
+        setConflict({
+          message: err.message || "Failed to start workflow run.",
+        });
       }
     },
   });
@@ -145,26 +172,49 @@ export default function IdeaDetailPage({
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-        {/* 409 Conflict Banner */}
-        {conflictError && (
-          <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-600/70 text-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-lg">
-            <div className="space-y-1">
+        {/* 409 Conflict Recovery Banner */}
+        {conflict && (
+          <div className="p-4 rounded-xl bg-amber-950/50 border border-amber-600/70 text-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+            <div className="space-y-1.5 flex-1">
               <div className="flex items-center space-x-2">
-                <span className="text-amber-400 font-bold text-sm">⚠️ Conflict</span>
-                <span className="text-xs text-amber-300/80 uppercase tracking-wide">
-                  Concurrent Run Guard
-                </span>
+                <span className="text-amber-400 font-bold text-sm">⚠️ Active Workflow Run Found</span>
+                {conflict.status && (
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-900/80 text-amber-200 font-mono border border-amber-700/60 uppercase">
+                    {conflict.status}
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-amber-200 font-mono leading-relaxed">
-                {conflictError}
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                {conflict.status === "NEEDS_REVIEW"
+                  ? "This idea already has an active workflow run waiting for your approval."
+                  : conflict.status === "RUNNING" || conflict.status === "PENDING" || conflict.status === "PUBLISHING"
+                  ? "This idea already has a workflow run actively in progress."
+                  : conflict.message}
               </p>
+              {conflict.workflow_run_id && (
+                <p className="text-[11px] text-amber-300/70 font-mono">
+                  Run ID: {conflict.workflow_run_id}
+                </p>
+              )}
             </div>
-            <button
-              onClick={() => setConflictError(null)}
-              className="self-start md:self-auto px-3 py-1 text-xs rounded bg-amber-900/60 hover:bg-amber-800 text-amber-100 border border-amber-700/60"
-            >
-              Dismiss
-            </button>
+
+            <div className="flex items-center space-x-3 shrink-0">
+              {conflict.workflow_run_id && (
+                <Link
+                  href={`/workflow-runs/${conflict.workflow_run_id}`}
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 shadow-md transition flex items-center space-x-1.5"
+                >
+                  <span>Open Existing Workflow</span>
+                  <span>→</span>
+                </Link>
+              )}
+              <button
+                onClick={() => setConflict(null)}
+                className="px-3 py-2 text-xs rounded-lg bg-amber-900/60 hover:bg-amber-800 text-amber-200 border border-amber-700/60 transition"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 

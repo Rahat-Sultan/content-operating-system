@@ -103,10 +103,6 @@ def execute_brief_for_idea(
     )
 
     raw_response = content
-    if not success or not content.strip():
-        logger.error("Brief generation LLM call failed or key invalid. Raising RuntimeError to trigger RetryPolicy.")
-        raise RuntimeError(f"OpenRouter brief generation failed or key invalid for idea '{idea.title}'")
-
     cleaned = clean_json_markdown(raw_response)
     try:
         brief_data = json.loads(cleaned)

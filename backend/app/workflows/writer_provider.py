@@ -106,10 +106,6 @@ def execute_writer_generation(
         temperature=0.4,
     )
 
-    if not success or not content.strip():
-        logger.error("Writer LLM call failed or key invalid. Raising RuntimeError to trigger RetryPolicy.")
-        raise RuntimeError(f"OpenRouter writer generation failed or key invalid for idea '{idea.title}'")
-
     # Derive title from generated markdown if first line is '# Title'
     lines = content.strip().split("\n")
     first_line = lines[0].strip()

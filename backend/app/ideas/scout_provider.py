@@ -3,8 +3,10 @@ import logging
 from typing import Any
 
 from app.llm.openrouter_client import (
+    check_api_key_configuration,
     clean_json_markdown,
     execute_llm_completion,
+    OpenRouterError,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,15 +86,18 @@ def execute_scout_and_score(
     """
     user_prompt = build_scout_prompt(strategy_name, strategy_config, items)
 
-    success, content, used_model, is_fallback = execute_llm_completion(
-        system_prompt=SCOUT_SCORING_SYSTEM_PROMPT,
-        user_prompt=user_prompt,
-        operation_name="Scout & Scoring",
-        response_format={"type": "json_object"},
-        temperature=0.2,
-    )
-
-    raw_response = content if (success and content.strip()) else ""
+    try:
+        success, content, used_model, is_fallback = execute_llm_completion(
+            system_prompt=SCOUT_SCORING_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            operation_name="Scout & Scoring",
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        raw_response = content if (success and content.strip()) else ""
+    except OpenRouterError as err:
+        logger.warning("Scout LLM execution failed (%s: %s). Falling back to rule-based ideas.", type(err).__name__, err)
+        raw_response = ""
 
     # Step 3: Rule-based fallback if no LLM responded or key missing/placeholder
     if not raw_response:

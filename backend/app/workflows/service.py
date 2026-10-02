@@ -64,10 +64,12 @@ def create_workflow_run(
     if existing_active:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"An active workflow run ({existing_active.id}) already exists for idea {idea_id} "
-                f"with status '{existing_active.status.value}'."
-            ),
+            detail={
+                "code": "ACTIVE_WORKFLOW_EXISTS",
+                "message": "An active workflow already exists for this idea.",
+                "workflow_run_id": str(existing_active.id),
+                "status": existing_active.status.value,
+            },
         )
 
     # 3. Insert workflow_runs row protected against race conditions
@@ -110,17 +112,16 @@ def create_workflow_run(
                 )
                 .first()
             )
-            if active_run:
-                detail_msg = (
-                    f"An active workflow run ({active_run.id}) already exists for idea {idea_id} "
-                    f"with status '{active_run.status.value}'."
-                )
-            else:
-                detail_msg = f"An active workflow run already exists for idea {idea_id}."
+            detail_payload = {
+                "code": "ACTIVE_WORKFLOW_EXISTS",
+                "message": "An active workflow already exists for this idea.",
+                "workflow_run_id": str(active_run.id) if active_run else "",
+                "status": active_run.status.value if active_run else "RUNNING",
+            }
 
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=detail_msg,
+                detail=detail_payload,
             ) from exc
 
         # Any other database integrity error should propagate as normal
