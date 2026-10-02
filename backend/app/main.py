@@ -10,7 +10,7 @@ from app.ideas.routes import router as ideas_router
 from app.sources.routes import router as sources_router
 from app.publishing.routes import router as publications_router
 from app.strategies.routes import router as strategies_router
-from app.ideas.scout_provider import check_api_key_configuration
+from app.llm.openrouter_client import check_api_key_configuration
 
 
 @asynccontextmanager

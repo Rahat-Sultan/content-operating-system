@@ -1,11 +1,11 @@
 import json
 import logging
-import os
-import re
 from typing import Any
-import httpx
 
-from app.config import settings
+from app.llm.openrouter_client import (
+    clean_json_markdown,
+    execute_llm_completion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,33 +37,6 @@ You MUST respond strictly with a valid JSON object matching this schema:
 }
 Only output the JSON object. Do not include markdown code blocks or additional text."""
 
-# Model fallback chain per specification
-PRIMARY_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
-FALLBACK_MODEL = "openrouter/free"
-
-
-def is_placeholder_key(key: str | None) -> bool:
-    """Check if the API key is missing, empty, or set to the default placeholder."""
-    if not key or not key.strip():
-        return True
-    return key.strip().lower() in ("your-key-here", "your-openrouter-key-here", "placeholder")
-
-
-def check_api_key_configuration() -> bool:
-    """Explicitly check and warn if OpenRouter API key is missing or placeholder."""
-    key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
-    if is_placeholder_key(key):
-        logger.warning(
-            "\n"
-            "====================================================================\n"
-            "⚠️  WARNING: OPENROUTER_API_KEY is not configured or is a placeholder!\n"
-            "   Discovery will run in FALLBACK MODE (is_fallback: true).\n"
-            "   To enable live LLM scouting, provide a valid OpenRouter API key.\n"
-            "====================================================================\n"
-        )
-        return False
-    return True
-
 
 def build_scout_prompt(strategy_name: str, strategy_config: dict[str, Any], items: list[dict[str, Any]]) -> str:
     items_text = []
@@ -93,50 +66,6 @@ def compute_final_score(rel: float, trend: float, nov: float, aud: float, qual: 
     return round(score, 3)
 
 
-def _call_openrouter_api(
-    api_key: str,
-    model: str,
-    user_prompt: str,
-    timeout: float = 35.0,
-) -> tuple[bool, str]:
-    """Call OpenRouter chat completions endpoint with structured json_object format."""
-    headers = {
-        "Authorization": f"Bearer {api_key.strip()}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": SCOUT_SCORING_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt},
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.2,
-    }
-
-    with httpx.Client(timeout=timeout) as client:
-        res = client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        if res.status_code != 200:
-            logger.warning(
-                "OpenRouter model %s returned status %d: %s",
-                model,
-                res.status_code,
-                res.text[:200],
-            )
-            return False, ""
-        data = res.json()
-        choices = data.get("choices") or []
-        if not choices:
-            logger.warning("OpenRouter model %s returned no choices: %s", model, str(data)[:200])
-            return False, ""
-        content = choices[0].get("message", {}).get("content", "")
-        return True, content
-
-
 def execute_scout_and_score(
     strategy_name: str,
     strategy_config: dict[str, Any],
@@ -146,41 +75,24 @@ def execute_scout_and_score(
     Executes Scout + Scoring combined.
     Returns: (scored_ideas, raw_prompt, raw_llm_response)
     
-    Fallback chain:
+    Fallback chain handled via app.llm.openrouter_client:
     1. Primary model: nvidia/nemotron-3-super-120b-a12b:free
-    2. Fallback model: openrouter/free
-    3. If neither available or key is placeholder: Rule-based fallback evaluator
+    2. Secondary model: google/gemma-4-26b-a4b-it:free
+    3. Fallback model: openrouter/free
+    4. If none available or key is placeholder: Rule-based fallback evaluator
        with explicit "is_fallback": true in scoring_metadata and loud warning.
     """
     user_prompt = build_scout_prompt(strategy_name, strategy_config, items)
-    api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
 
-    is_key_valid = not is_placeholder_key(api_key)
-    raw_response = ""
-    used_model = None
-    is_fallback = False
+    success, content, used_model, is_fallback = execute_llm_completion(
+        system_prompt=SCOUT_SCORING_SYSTEM_PROMPT,
+        user_prompt=user_prompt,
+        operation_name="Scout & Scoring",
+        response_format={"type": "json_object"},
+        temperature=0.2,
+    )
 
-    if is_key_valid:
-        # Step 1: Try Primary Model
-        logger.info("Calling OpenRouter with Primary Model: %s", PRIMARY_MODEL)
-        try:
-            success, content = _call_openrouter_api(api_key, PRIMARY_MODEL, user_prompt)
-            if success and content.strip():
-                raw_response = content
-                used_model = PRIMARY_MODEL
-        except Exception as e:
-            logger.warning("Primary model %s failed: %s", PRIMARY_MODEL, str(e))
-
-        # Step 2: Try Fallback Model if primary failed
-        if not raw_response:
-            logger.info("Falling back to OpenRouter auto-router: %s", FALLBACK_MODEL)
-            try:
-                success, content = _call_openrouter_api(api_key, FALLBACK_MODEL, user_prompt)
-                if success and content.strip():
-                    raw_response = content
-                    used_model = FALLBACK_MODEL
-            except Exception as e:
-                logger.warning("Fallback model %s failed: %s", FALLBACK_MODEL, str(e))
+    raw_response = content if (success and content.strip()) else ""
 
     # Step 3: Rule-based fallback if no LLM responded or key missing/placeholder
     if not raw_response:
@@ -206,15 +118,7 @@ def execute_scout_and_score(
             })
         raw_response = json.dumps({"ideas": ideas_data}, indent=2)
 
-    # Clean potential markdown fences from response
-    cleaned = raw_response.strip()
-    if cleaned.startswith("```json"):
-        cleaned = cleaned[len("```json"):].strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned[len("```"):].strip()
-    if cleaned.endswith("```"):
-        cleaned = cleaned[:-len("```")].strip()
-
+    cleaned = clean_json_markdown(raw_response)
     parsed = json.loads(cleaned)
     raw_ideas = parsed.get("ideas", [])
 
