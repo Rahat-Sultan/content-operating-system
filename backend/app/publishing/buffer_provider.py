@@ -28,16 +28,17 @@ def is_placeholder_buffer_token(token: str | None) -> bool:
 class BufferPublisher(PublisherInterface):
     """
     Real Buffer publishing provider using Buffer's modern GraphQL API.
-    Buffer has deprecated the legacy REST API (api.bufferapp.com/1) in favor of api.buffer.com GraphQL.
     
     Flow:
-    1. Resolve organization and active connected channel (or explicit channelId).
-    2. Execute createPost mutation (or createIdea as fallback if no social channels connected).
-    3. Map outcomes to Content OS exception hierarchy:
+    1. Resolve organization and find the connected channel matching request.platform (e.g. 'linkedin').
+    2. Strict validation: If no connected channel for the requested platform exists on the organization,
+       raise PermanentPublishingError immediately. Never silently fall back to creating an Idea/Draft.
+    3. Execute createPost mutation (mode: shareNow, schedulingType: automatic).
+    4. Map outcomes to Content OS exception hierarchy:
        - Network timeout / connection drop -> AmbiguousTimeoutPublishingError
        - 429 / server 5xx -> TransientPublishingError
-       - 400 / 401 / 403 / schema reject -> PermanentPublishingError
-    4. Return real external post ID and Buffer URL.
+       - 400 / 401 / 403 / schema reject / channel missing -> PermanentPublishingError
+    5. Return real external post ID and Buffer URL.
     """
 
     def __init__(
@@ -125,9 +126,13 @@ class BufferPublisher(PublisherInterface):
         logger.info("Resolved Buffer Organization: %s (channels: %d)", self.organization_id, channel_count)
         return self.organization_id, channel_count
 
-    def _resolve_channel(self, client: httpx.Client, org_id: str) -> str | None:
+    def _resolve_channel_for_platform(self, client: httpx.Client, org_id: str, platform: str) -> dict[str, Any]:
+        """
+        Resolves the connected channel for the target platform (e.g. 'linkedin').
+        Raises PermanentPublishingError if no connected channel for the platform is found.
+        """
         if self.channel_id:
-            return self.channel_id
+            return {"id": self.channel_id, "service": platform, "name": "configured_channel"}
 
         query = """
         query GetChannels($input: ChannelsInput!) {
@@ -142,17 +147,36 @@ class BufferPublisher(PublisherInterface):
         data = self._execute_graphql(client, query, variables)
         errors = data.get("errors")
         if errors:
-            logger.warning("Error fetching channels for organization %s: %s", org_id, errors)
-            return None
+            raise PermanentPublishingError(f"Error fetching channels for Buffer organization {org_id}: {errors[0].get('message')}")
 
         channels = data.get("data", {}).get("channels") or []
-        if channels:
-            selected = channels[0]
-            self.channel_id = selected["id"]
-            logger.info("Auto-resolved Buffer Channel: %s (%s, %s)", self.channel_id, selected.get("service"), selected.get("name"))
-            return self.channel_id
+        if not channels:
+            raise PermanentPublishingError(
+                f"No connected social channels found on Buffer organization '{org_id}'. "
+                f"Cannot publish {platform} post."
+            )
 
-        return None
+        # Match platform (e.g. 'linkedin') against channel service
+        norm_platform = platform.lower().strip()
+        matching = [c for c in channels if c.get("service", "").lower().strip() == norm_platform]
+
+        if not matching:
+            available_services = [c.get("service") for c in channels]
+            raise PermanentPublishingError(
+                f"No connected '{platform}' channel found on Buffer organization '{org_id}'. "
+                f"Connected channels exist for: {available_services}. "
+                f"Please connect a {platform} channel in Buffer."
+            )
+
+        selected = matching[0]
+        logger.info(
+            "Resolved Buffer Channel for platform '%s': %s (service: %s, name: %s)",
+            platform,
+            selected["id"],
+            selected.get("service"),
+            selected.get("name"),
+        )
+        return selected
 
     def publish(self, request: PublishRequest) -> PublishResult:
         if is_placeholder_buffer_token(self.access_token):
@@ -164,144 +188,97 @@ class BufferPublisher(PublisherInterface):
         if request.title and not text_to_publish.strip().startswith(request.title.strip()):
             text_to_publish = f"{request.title.strip()}\n\n{text_to_publish.strip()}"
 
+        # Platform length constraints: LinkedIn posts have a hard 3,000 character limit
+        if request.platform.lower().strip() == "linkedin" and len(text_to_publish) > 2980:
+            logger.info(
+                "Adapting post text for LinkedIn platform limit (original len: %d -> 2980)",
+                len(text_to_publish),
+            )
+            text_to_publish = text_to_publish[:2950].rstrip() + "\n\n... [Read full deep-dive in repo]"
+
         with httpx.Client(timeout=self.timeout) as client:
-            org_id, channel_count = self._resolve_organization(client)
-            channel_id = self._resolve_channel(client, org_id)
+            org_id, _ = self._resolve_organization(client)
+            channel = self._resolve_channel_for_platform(client, org_id, request.platform)
+            channel_id = channel["id"]
 
-            if channel_id:
-                # Connected social channel exists -> execute createPost mutation
-                logger.info(
-                    "Publishing post to Buffer Channel %s (idempotency: %s)",
-                    channel_id,
-                    request.idempotency_key,
-                )
-                create_post_mutation = """
-                mutation CreatePost($input: CreatePostInput!) {
-                  createPost(input: $input) {
-                    __typename
-                    ... on PostActionSuccess {
-                      post {
-                        id
-                        status
-                        externalLink
-                      }
-                    }
-                    ... on UnauthorizedError {
-                      message
-                    }
-                    ... on NotFoundError {
-                      message
-                    }
-                    ... on InvalidInputError {
-                      message
-                    }
-                    ... on UnexpectedError {
-                      message
-                    }
-                    ... on LimitReachedError {
-                      message
-                    }
+            logger.info(
+                "Dispatching real post to Buffer Channel %s (%s) for platform '%s' (idempotency: %s)",
+                channel_id,
+                channel.get("name"),
+                request.platform,
+                request.idempotency_key,
+            )
+
+            create_post_mutation = """
+            mutation CreatePost($input: CreatePostInput!) {
+              createPost(input: $input) {
+                __typename
+                ... on PostActionSuccess {
+                  post {
+                    id
+                    status
+                    externalLink
                   }
                 }
-                """
-                variables = {
-                    "input": {
-                        "channelId": channel_id,
-                        "text": text_to_publish,
-                        "mode": "shareNow",
-                        "schedulingType": "automatic",
-                        "needsApproval": False,
-                        "assets": [],
-                    }
+                ... on UnauthorizedError {
+                  message
                 }
-                resp_data = self._execute_graphql(client, create_post_mutation, variables)
-                errors = resp_data.get("errors")
-                if errors:
-                    raise PermanentPublishingError(f"Buffer createPost failed: {errors[0].get('message')}")
-
-                payload = resp_data.get("data", {}).get("createPost") or {}
-                typename = payload.get("__typename")
-                if typename != "PostActionSuccess":
-                    err_msg = payload.get("message", f"Unexpected Buffer payload type: {typename}")
-                    raise PermanentPublishingError(f"Buffer createPost rejected: {err_msg}")
-
-                post = payload.get("post") or {}
-                post_id = post.get("id") or f"buffer_{request.idempotency_key[:12]}"
-                post_url = post.get("externalLink") or f"https://publish.buffer.com/organization/{org_id}/channels/{channel_id}"
-
-                logger.info("Buffer post successfully created via GraphQL: %s", post_id)
-                return PublishResult(
-                    platform=request.platform,
-                    external_post_id=str(post_id),
-                    url=post_url,
-                    published_at=datetime.now(timezone.utc),
-                    provider_metadata={
-                        "provider": "buffer",
-                        "organization_id": org_id,
-                        "channel_id": channel_id,
-                        "post_id": post_id,
-                        "idempotency_key": request.idempotency_key,
-                    },
-                )
-            else:
-                # No social channels connected yet on this organization
-                # Buffer provides the Ideas / Content pipeline for storing pre-published drafts & ideas
-                logger.info(
-                    "No connected social channel on organization %s. Creating Idea/Draft item in Buffer library.",
-                    org_id,
-                )
-                create_idea_mutation = """
-                mutation CreateIdea($input: CreateIdeaInput!) {
-                  createIdea(input: $input) {
-                    __typename
-                    ... on Idea {
-                      id
-                      createdAt
-                    }
-                    ... on InvalidInputError {
-                      message
-                    }
-                    ... on UnauthorizedError {
-                      message
-                    }
-                    ... on LimitReachedError {
-                      message
-                    }
-                  }
+                ... on NotFoundError {
+                  message
                 }
-                """
-                variables = {
-                    "input": {
-                        "organizationId": org_id,
-                        "content": {
-                            "text": text_to_publish,
-                        },
-                    }
+                ... on InvalidInputError {
+                  message
                 }
-                resp_data = self._execute_graphql(client, create_idea_mutation, variables)
-                errors = resp_data.get("errors")
-                if errors:
-                    raise PermanentPublishingError(f"Buffer createIdea failed: {errors[0].get('message')}")
+                ... on UnexpectedError {
+                  message
+                }
+                ... on LimitReachedError {
+                  message
+                }
+              }
+            }
+            """
+            variables = {
+                "input": {
+                    "channelId": channel_id,
+                    "text": text_to_publish,
+                    "mode": "shareNow",
+                    "schedulingType": "automatic",
+                    "needsApproval": False,
+                    "assets": [],
+                }
+            }
+            resp_data = self._execute_graphql(client, create_post_mutation, variables)
+            errors = resp_data.get("errors")
+            if errors:
+                raise PermanentPublishingError(f"Buffer createPost failed: {errors[0].get('message')}")
 
-                payload = resp_data.get("data", {}).get("createIdea") or {}
-                typename = payload.get("__typename")
-                if typename != "Idea":
-                    err_msg = payload.get("message", f"Unexpected Buffer payload type: {typename}")
-                    raise PermanentPublishingError(f"Buffer createIdea rejected: {err_msg}")
+            payload = resp_data.get("data", {}).get("createPost") or {}
+            typename = payload.get("__typename")
+            if typename != "PostActionSuccess":
+                err_msg = payload.get("message", f"Unexpected Buffer payload type: {typename}")
+                raise PermanentPublishingError(f"Buffer createPost rejected: {err_msg}")
 
-                idea_id = payload.get("id")
-                post_url = f"https://publish.buffer.com/organization/{org_id}/content/ideas/{idea_id}"
+            post = payload.get("post") or {}
+            post_id = post.get("id")
+            if not post_id:
+                raise PermanentPublishingError("Buffer createPost returned PostActionSuccess but post.id was empty")
 
-                logger.info("Buffer item successfully published as Idea: %s (%s)", idea_id, post_url)
-                return PublishResult(
-                    platform=request.platform,
-                    external_post_id=f"buffer_idea_{idea_id}",
-                    url=post_url,
-                    published_at=datetime.now(timezone.utc),
-                    provider_metadata={
-                        "provider": "buffer",
-                        "organization_id": org_id,
-                        "idea_id": idea_id,
-                        "idempotency_key": request.idempotency_key,
-                    },
-                )
+            post_url = post.get("externalLink") or f"https://publish.buffer.com/organization/{org_id}/channels/{channel_id}"
+
+            logger.info("Buffer post successfully created via GraphQL: %s (url: %s)", post_id, post_url)
+            return PublishResult(
+                platform=request.platform,
+                external_post_id=str(post_id),
+                url=post_url,
+                published_at=datetime.now(timezone.utc),
+                provider_metadata={
+                    "provider": "buffer",
+                    "organization_id": org_id,
+                    "channel_id": channel_id,
+                    "channel_name": channel.get("name"),
+                    "channel_service": channel.get("service"),
+                    "post_id": post_id,
+                    "idempotency_key": request.idempotency_key,
+                },
+            )
