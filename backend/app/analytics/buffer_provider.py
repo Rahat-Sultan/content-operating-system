@@ -11,6 +11,7 @@ from app.analytics.interface import (
     AnalyticsResult,
     PermanentAnalyticsError,
     TransientAnalyticsError,
+    MetricsNotAvailableError,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,12 +94,16 @@ class BufferAnalyticsProvider(AnalyticsProvider):
             err_msg = errors[0].get("message", "Unknown GraphQL error")
             logger.error("Buffer GraphQL error fetching metrics for post %s: %s", post_id, err_msg)
             if "not found" in err_msg.lower():
-                raise PermanentAnalyticsError(f"Buffer post '{post_id}' not found: {err_msg}")
+                raise MetricsNotAvailableError(
+                    f"Metrics for post '{post_id}' are not yet available from Buffer (propagation delay). Please try again shortly."
+                )
             raise PermanentAnalyticsError(f"Buffer analytics query error: {err_msg}")
 
         post_data = data.get("data", {}).get("post")
         if not post_data:
-            raise PermanentAnalyticsError(f"Buffer post '{post_id}' returned empty payload.")
+            raise MetricsNotAvailableError(
+                f"Metrics for post '{post_id}' are not yet indexed by Buffer. Please try again shortly."
+            )
 
         raw_metrics_list = post_data.get("metrics") or []
         metrics_dict: dict[str, Any] = {

@@ -19,9 +19,19 @@ class TransientAnalyticsError(AnalyticsError):
 
 
 class PermanentAnalyticsError(AnalyticsError):
-    """Terminal failure (e.g. bad credentials, post not found); do not retry."""
+    """Terminal failure (e.g. bad credentials, post deleted/invalid); do not retry."""
     def __init__(self, message: str):
         super().__init__(message, is_transient=False)
+
+
+class MetricsNotAvailableError(AnalyticsError):
+    """
+    Post metrics are not yet available from the provider (e.g. downstream platform
+    processing or Buffer analytics indexing delay for newly published posts).
+    Retryable after a short delay.
+    """
+    def __init__(self, message: str = "Metrics are not yet available from the provider. Please try again shortly."):
+        super().__init__(message, is_transient=True)
 
 
 @dataclass

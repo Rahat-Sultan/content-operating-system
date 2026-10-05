@@ -4,7 +4,12 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.analytics.models import Analytics
-from app.analytics.interface import AnalyticsRequest, PermanentAnalyticsError, TransientAnalyticsError
+from app.analytics.interface import (
+    AnalyticsRequest,
+    PermanentAnalyticsError,
+    TransientAnalyticsError,
+    MetricsNotAvailableError,
+)
 from app.analytics.factory import get_analytics_provider
 from app.publishing.models import Publication, PublicationStatus
 
@@ -50,6 +55,12 @@ def sync_publication_metrics(db: Session, publication_id: UUID) -> Analytics:
 
     try:
         result = provider.fetch_metrics(request)
+    except MetricsNotAvailableError as not_ready_err:
+        logger.info("Metrics not ready for publication %s: %s", publication_id, not_ready_err)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Metrics not yet available: Buffer is still indexing this post. Please try again shortly.",
+        ) from not_ready_err
     except PermanentAnalyticsError as perm_err:
         logger.error("Permanent error syncing metrics for publication %s: %s", publication_id, perm_err)
         raise HTTPException(
