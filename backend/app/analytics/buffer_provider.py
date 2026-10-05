@@ -92,10 +92,11 @@ class BufferAnalyticsProvider(AnalyticsProvider):
         errors = data.get("errors")
         if errors:
             err_msg = errors[0].get("message", "Unknown GraphQL error")
-            logger.error("Buffer GraphQL error fetching metrics for post %s: %s", post_id, err_msg)
-            if "not found" in err_msg.lower():
-                raise MetricsNotAvailableError(
-                    f"Metrics for post '{post_id}' are not yet available from Buffer (propagation delay). Please try again shortly."
+            err_code = errors[0].get("extensions", {}).get("code", "")
+            logger.error("Buffer GraphQL error fetching metrics for post %s: %s (code=%s)", post_id, err_msg, err_code)
+            if "not found" in err_msg.lower() or err_code == "NOT_FOUND":
+                raise PostNotFoundError(
+                    f"Post '{post_id}' not found on Buffer (permanent 404). Please verify external post ID."
                 )
             raise PermanentAnalyticsError(f"Buffer analytics query error: {err_msg}")
 

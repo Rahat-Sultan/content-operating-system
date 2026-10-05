@@ -9,6 +9,7 @@ from app.analytics.interface import (
     PermanentAnalyticsError,
     TransientAnalyticsError,
     MetricsNotAvailableError,
+    PostNotFoundError,
 )
 from app.analytics.factory import get_analytics_provider
 from app.publishing.models import Publication, PublicationStatus
@@ -61,6 +62,12 @@ def sync_publication_metrics(db: Session, publication_id: UUID) -> Analytics:
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Metrics not yet available: Buffer is still indexing this post. Please try again shortly.",
         ) from not_ready_err
+    except PostNotFoundError as not_found_err:
+        logger.error("Post permanently not found for publication %s: %s", publication_id, not_found_err)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post not found on analytics provider (permanent 404): {not_found_err}",
+        ) from not_found_err
     except PermanentAnalyticsError as perm_err:
         logger.error("Permanent error syncing metrics for publication %s: %s", publication_id, perm_err)
         raise HTTPException(

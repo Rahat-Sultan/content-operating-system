@@ -24,6 +24,12 @@ class PermanentAnalyticsError(AnalyticsError):
         super().__init__(message, is_transient=False)
 
 
+class PostNotFoundError(PermanentAnalyticsError):
+    """Post does not exist on provider (permanent 404)."""
+    def __init__(self, message: str = "Post not found on analytics provider."):
+        super().__init__(message)
+
+
 class MetricsNotAvailableError(AnalyticsError):
     """
     Post metrics are not yet available from the provider (e.g. downstream platform
