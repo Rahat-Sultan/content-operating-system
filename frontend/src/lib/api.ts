@@ -395,6 +395,45 @@ export async function updateSource(id: string, payload: UpdateSourcePayload): Pr
   }
   return data;
 }
+export interface AnalyticsSnapshot {
+  id: string;
+  publication_id: string;
+  metrics: {
+    impressions?: number;
+    clicks?: number;
+    likes?: number;
+    reactions?: number;
+    comments?: number;
+    shares?: number;
+    engagement_rate?: number;
+    is_stub?: boolean;
+    is_initial?: boolean;
+    provider?: string;
+    post_status?: string;
+    sent_at?: string;
+    metrics_updated_at?: string;
+    raw_metrics?: any[];
+    [key: string]: any;
+  };
+  collected_at: string;
+}
 
+export async function fetchPublicationAnalytics(publicationId: string): Promise<AnalyticsSnapshot[]> {
+  const res = await fetch(`${API_BASE}/publications/${publicationId}/analytics`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch analytics for publication ${publicationId}: ${res.statusText}`);
+  }
+  return res.json();
+}
 
-
+export async function syncPublicationAnalytics(publicationId: string): Promise<AnalyticsSnapshot> {
+  const res = await fetch(`${API_BASE}/publications/${publicationId}/analytics/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to sync publication analytics");
+  }
+  return data;
+}

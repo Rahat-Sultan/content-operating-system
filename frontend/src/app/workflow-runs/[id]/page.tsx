@@ -11,6 +11,8 @@ import {
   fetchWorkflowRunDraft,
   submitApprovalDecision,
   fetchWorkflowRunPublication,
+  fetchPublicationAnalytics,
+  syncPublicationAnalytics,
 } from "@/lib/api";
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -105,6 +107,33 @@ export default function WorkflowRunDetailPage({
       return false;
     },
     retry: false,
+  });
+
+  // 7. Publication Analytics & Metrics Snapshots
+  const {
+    data: analyticsSnapshots,
+    isLoading: isAnalyticsLoading,
+    refetch: refetchAnalytics,
+  } = useQuery({
+    queryKey: ["publication-analytics", publication?.id],
+    queryFn: () => fetchPublicationAnalytics(publication!.id),
+    enabled: !!publication?.id && publication?.status === "PUBLISHED",
+  });
+
+  // Sync Metrics Mutation
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const syncMetricsMutation = useMutation({
+    mutationFn: () => {
+      if (!publication?.id) throw new Error("No publication found to sync metrics for.");
+      return syncPublicationAnalytics(publication.id);
+    },
+    onSuccess: () => {
+      setSyncError(null);
+      refetchAnalytics();
+    },
+    onError: (err: any) => {
+      setSyncError(err?.message || "Failed to sync metrics from provider.");
+    },
   });
 
   // Approval Mutation
@@ -384,6 +413,176 @@ export default function WorkflowRunDetailPage({
               {publication.error && (
                 <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs font-mono">
                   {publication.error}
+                </div>
+              )}
+
+              {/* Metrics & Analytics Section */}
+              {publication.status === "PUBLISHED" && (
+                <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Publication Metrics & Analytics
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Real performance metrics polled from Buffer
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => syncMetricsMutation.mutate()}
+                      disabled={syncMetricsMutation.isPending}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
+                    >
+                      {syncMetricsMutation.isPending ? (
+                        <>
+                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1" />
+                          <span>Syncing...</span>
+                        </>
+                      ) : (
+                        <span>Sync Metrics</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {syncError && (
+                    <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs font-mono">
+                      Sync Error: {syncError}
+                    </div>
+                  )}
+
+                  {/* Latest Metrics Summary Cards */}
+                  {(() => {
+                    const latestSnapshot = analyticsSnapshots && analyticsSnapshots.length > 0 
+                      ? analyticsSnapshots[0] 
+                      : null;
+                    const metrics = latestSnapshot?.metrics || {};
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Impressions
+                            </span>
+                            <span className="text-lg font-bold text-slate-100 font-mono">
+                              {metrics.impressions ?? 0}
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Clicks
+                            </span>
+                            <span className="text-lg font-bold text-slate-100 font-mono">
+                              {metrics.clicks ?? 0}
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Likes / Reactions
+                            </span>
+                            <span className="text-lg font-bold text-slate-100 font-mono">
+                              {metrics.likes ?? metrics.reactions ?? 0}
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Comments
+                            </span>
+                            <span className="text-lg font-bold text-slate-100 font-mono">
+                              {metrics.comments ?? 0}
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Shares
+                            </span>
+                            <span className="text-lg font-bold text-slate-100 font-mono">
+                              {metrics.shares ?? 0}
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Last Synced
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-300 block truncate" title={latestSnapshot?.collected_at || "Never"}>
+                              {latestSnapshot?.collected_at ? new Date(latestSnapshot.collected_at).toLocaleTimeString() : "Never"}
+                            </span>
+                            <span className="text-[9px] text-slate-500 block">
+                              {metrics.is_stub ? "Initial Stub" : metrics.provider || "Buffer"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Historical Snapshots Table */}
+                        {analyticsSnapshots && analyticsSnapshots.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-semibold text-slate-400">
+                                Historical Snapshots ({analyticsSnapshots.length})
+                              </span>
+                              {isAnalyticsLoading && (
+                                <span className="text-[10px] text-slate-500 animate-pulse">Refreshing...</span>
+                              )}
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-slate-800/80 bg-slate-950/40">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-900/80 text-[10px] uppercase text-slate-500 border-b border-slate-800/80">
+                                  <tr>
+                                    <th className="py-2 px-3 font-semibold">Collected At</th>
+                                    <th className="py-2 px-3 font-semibold">Provider</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Impressions</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Clicks</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Reactions</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Comments</th>
+                                    <th className="py-2 px-3 font-semibold text-right">Shares</th>
+                                    <th className="py-2 px-3 font-semibold text-center">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
+                                  {analyticsSnapshots.map((snap) => (
+                                    <tr key={snap.id} className="hover:bg-slate-900/40">
+                                      <td className="py-2 px-3 text-slate-300 whitespace-nowrap">
+                                        {new Date(snap.collected_at).toLocaleString()}
+                                      </td>
+                                      <td className="py-2 px-3 text-slate-400">
+                                        {snap.metrics.is_stub ? (
+                                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950/60 text-amber-400 border border-amber-800/60">stub</span>
+                                        ) : (
+                                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950/60 text-indigo-300 border border-indigo-800/60">
+                                            {snap.metrics.provider || "buffer"}
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-slate-200">
+                                        {snap.metrics.impressions ?? 0}
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-slate-200">
+                                        {snap.metrics.clicks ?? 0}
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-slate-200">
+                                        {snap.metrics.likes ?? snap.metrics.reactions ?? 0}
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-slate-200">
+                                        {snap.metrics.comments ?? 0}
+                                      </td>
+                                      <td className="py-2 px-3 text-right text-slate-200">
+                                        {snap.metrics.shares ?? 0}
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        <span className="text-[10px] text-slate-400">
+                                          {snap.metrics.post_status || "synced"}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

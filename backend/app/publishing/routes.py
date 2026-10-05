@@ -34,6 +34,7 @@ def get_publication_analytics(
 ):
     """
     Get analytics performance snapshots for a publication by publication ID.
+    Returns all historical snapshots, ordered by collection time descending.
     """
     publication = db.query(Publication).filter(Publication.id == id).first()
     if not publication:
@@ -49,3 +50,16 @@ def get_publication_analytics(
         .all()
     )
     return records
+
+
+@router.post("/{id}/analytics/sync", response_model=AnalyticsResponse, status_code=status.HTTP_201_CREATED)
+def sync_publication_analytics_endpoint(
+    id: UUID,
+    db: Session = Depends(get_db),
+):
+    """
+    Manually triggers analytics sync for a published post.
+    Calls configured analytics provider (e.g. Buffer) and appends a new historical snapshot.
+    """
+    from app.analytics.service import sync_publication_metrics
+    return sync_publication_metrics(db=db, publication_id=id)
