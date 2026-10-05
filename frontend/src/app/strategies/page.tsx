@@ -24,6 +24,7 @@ export default function StrategiesPage() {
     platforms: string;
     tone: string;
     voice_guidelines: string;
+    voice_sample: string;
     enabled: boolean;
     source_ids: string[];
   }>({
@@ -36,6 +37,7 @@ export default function StrategiesPage() {
     platforms: "LinkedIn",
     tone: "Authoritative and educational",
     voice_guidelines: "",
+    voice_sample: "",
     enabled: true,
     source_ids: [],
   });
@@ -73,6 +75,7 @@ export default function StrategiesPage() {
         platforms: "LinkedIn",
         tone: "Authoritative and educational",
         voice_guidelines: "",
+        voice_sample: "",
         enabled: true,
         source_ids: [],
       });
@@ -120,6 +123,7 @@ export default function StrategiesPage() {
           : ["LinkedIn"],
         tone: formData.tone.trim() || undefined,
         voice_guidelines: formData.voice_guidelines.trim() || undefined,
+        voice_sample: formData.voice_sample.trim() || undefined,
       },
       source_ids: formData.source_ids,
     };
@@ -391,6 +395,22 @@ export default function StrategiesPage() {
                     className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Voice / Style Sample (Optional)
+                </label>
+                <p className="text-slate-500 text-[11px] mb-1.5">
+                  Paste an excerpt of real writing you want the Writer to emulate (tone, sentence rhythm, and vocabulary).
+                </p>
+                <textarea
+                  rows={4}
+                  placeholder="Paste an excerpt of how you or your team actually write..."
+                  value={formData.voice_sample}
+                  onChange={(e) => setFormData({ ...formData, voice_sample: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                />
               </div>
 
               {/* Attach Sources */}

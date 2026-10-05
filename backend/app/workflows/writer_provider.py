@@ -14,16 +14,24 @@ from app.workflows.models import ContentBrief, Research
 
 logger = logging.getLogger(__name__)
 
-WRITER_SYSTEM_PROMPT = """You are a principal technical author and systems architect writing a deep, authoritative publication for senior software engineers.
+WRITER_SYSTEM_PROMPT = """You are a seasoned principal systems engineer and technical practitioner writing from direct, hard-won experience for senior software engineers.
 
 Your writing standards:
-1. Grounded & Concrete: Base explanations directly on the provided research and brief.
-2. Tone: Authoritative, pragmatic, direct, and technically rigorous. Avoid fluff, hyperbolic marketing buzzwords ("revolutionary", "game-changing"), and generic introductory pleasantries.
+1. Grounded & Concrete: Base explanations directly on the provided research, mechanics, and tradeoffs. Avoid hand-wavy claims.
+2. Voice & Tone:
+   - Write in first person ("I", "we observed", "in our systems") with an authentic practitioner perspective.
+   - Speak like an engineer writing an engineering retrospective or thoughtful technical note to their peers, not a marketer, corporate spokesperson, or PR blog.
+   - FORBIDDEN AI TELLS (strictly avoid):
+     * DO NOT use cliches or introductory throat-clearing: "In today's fast-paced world...", "In the ever-evolving landscape...", "Let's dive in", "In this article, we will explore", "Without further ado".
+     * DO NOT use generic summary conclusions: "In conclusion...", "To wrap up...", "All in all...". End naturally on a concrete architectural takeaway or realistic tradeoff.
+     * DO NOT use generic engagement bait / CTAs: "What are your thoughts? Let me know in the comments!", "How does your team handle this? Share below!".
+     * DO NOT write in uniform, predictable bullet lists with bold headers unless describing genuine technical lists (like configuration keys or discrete failure modes). Vary paragraph rhythms and sentence lengths.
+     * Avoid marketing hyperbole: "revolutionary", "game-changing", "seamlessly", "paradigm shift", "leverage".
 3. Structure:
-   - Strong title starting with a clear headline.
-   - Compelling technical opening that frames the core problem and real failure modes.
-   - Comprehensive architectural deep dive with system mechanics, tradeoffs, and code/design patterns.
-   - Actionable takeaways or implementation checklists.
+   - Strong, direct title.
+   - Immediate immersion in the engineering reality, bottleneck, or failure mode without preamble.
+   - Technical substance: mechanics, specific constraints, production tradeoffs, and pragmatic code/architectural realities.
+   - Clean ending highlighting the key takeaway or production caveat.
 4. Output Markdown: Format your draft in clean, standard GitHub-flavored Markdown. Do not wrap the entire output in triple backticks."""
 
 
@@ -41,6 +49,20 @@ def build_writer_prompt(
     key_findings = findings.get("key_findings", [])
     claims = findings.get("important_claims", [])
 
+    strategy_config = (strategy.config or {}) if strategy else {}
+    voice_sample = strategy_config.get("voice_sample")
+
+    voice_sample_section = ""
+    if voice_sample and voice_sample.strip():
+        voice_sample_section = f"""
+EXPLICIT AUTHOR VOICE SAMPLE TO EMULATE:
+You must match the tone, sentence rhythm, cadence, and vocabulary level of the following sample writing.
+Do NOT copy phrases or topics from the sample, but capture the author's distinct human voice, attitude, skepticism, and narrative style:
+\"\"\"
+{voice_sample.strip()}
+\"\"\"
+"""
+
     revision_instructions = ""
     if version_number > 1 and approval_feedback:
         revision_instructions = f"""
@@ -53,9 +75,9 @@ Do NOT just re-run the previous text unchanged — adapt the tone, structure, or
 """
 
     return f"""Target Strategy: {strategy.name if strategy else "Engineering"}
-Strategy Voice & Tone: {(strategy.config.get("tone") if strategy and strategy.config else "Direct, authoritative, technically rigorous")}
+Strategy Voice & Tone: {strategy_config.get("tone", "Direct, authoritative, technically rigorous")}
 Target Audience: {brief_data.get("target_audience", "Senior Software Engineers")}
-
+{voice_sample_section}
 Idea Title: {idea.title}
 Editorial Angle: {brief_data.get("angle", idea.title)}
 Opening Hook: {brief_data.get("hook", "Architectural exploration")}
@@ -69,7 +91,7 @@ Grounded Research Findings:
 - Key Findings: {json.dumps(key_findings)}
 - Verified Claims: {json.dumps(claims)}
 {revision_instructions}
-Draft the complete, publication-ready technical article (minimum 400-600 words) adhering strictly to these requirements."""
+Draft the complete, publication-ready technical article (minimum 400-600 words) adhering strictly to these requirements and style standards."""
 
 
 def execute_writer_generation(

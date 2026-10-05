@@ -32,6 +32,7 @@ export default function StrategyDetailPage({
     platforms: string;
     tone: string;
     voice_guidelines: string;
+    voice_sample: string;
     enabled: boolean;
     source_ids: string[];
   }>({
@@ -44,6 +45,7 @@ export default function StrategyDetailPage({
     platforms: "",
     tone: "",
     voice_guidelines: "",
+    voice_sample: "",
     enabled: true,
     source_ids: [],
   });
@@ -79,6 +81,7 @@ export default function StrategyDetailPage({
         platforms: (strategy.config?.platforms || ["LinkedIn"]).join(", "),
         tone: strategy.config?.tone || "",
         voice_guidelines: strategy.config?.voice_guidelines || "",
+        voice_sample: strategy.config?.voice_sample || "",
         enabled: strategy.enabled,
         source_ids: strategy.sources?.map((s) => s.id) || [],
       });
@@ -149,6 +152,7 @@ export default function StrategyDetailPage({
           : ["LinkedIn"],
         tone: formData.tone.trim() || undefined,
         voice_guidelines: formData.voice_guidelines.trim() || undefined,
+        voice_sample: formData.voice_sample.trim() || undefined,
       },
       source_ids: formData.source_ids,
     };
@@ -365,6 +369,18 @@ export default function StrategyDetailPage({
                     )}
                   </dd>
                 </div>
+                <div className="col-span-full">
+                  <dt className="text-slate-500">Voice / Style Sample</dt>
+                  <dd className="mt-1">
+                    {strategy.config?.voice_sample ? (
+                      <pre className="text-xs bg-slate-950 p-3 rounded-lg border border-slate-800 text-slate-300 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
+                        {strategy.config.voice_sample}
+                      </pre>
+                    ) : (
+                      <span className="text-slate-500 italic text-xs">No voice sample provided</span>
+                    )}
+                  </dd>
+                </div>
               </dl>
             </section>
 
@@ -503,6 +519,22 @@ export default function StrategyDetailPage({
                     className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Voice / Style Sample (Optional)
+                </label>
+                <p className="text-slate-500 text-[11px] mb-1.5">
+                  Paste an excerpt of real writing you want the Writer to emulate (tone, sentence rhythm, and vocabulary).
+                </p>
+                <textarea
+                  rows={4}
+                  placeholder="Paste an excerpt of how you or your team actually write..."
+                  value={formData.voice_sample}
+                  onChange={(e) => setFormData({ ...formData, voice_sample: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                />
               </div>
 
               {/* Source Attachment Selector */}
