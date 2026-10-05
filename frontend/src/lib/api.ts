@@ -54,12 +54,18 @@ export interface ContentBriefResponse {
   created_at: string;
 }
 
+export interface DraftLintWarning {
+  category: "leakage" | "ai_tell" | "unsupported_experience" | string;
+  message: string;
+}
+
 export interface ContentVersionSummary {
   id: string;
   version_number: number;
   origin: string;
   title?: string | null;
   body: string;
+  lint_warnings?: DraftLintWarning[];
   created_at: string;
 }
 
@@ -68,6 +74,7 @@ export interface ContentDraftResponse {
   workflow_run_id: string;
   current_version: ContentVersionSummary;
   versions: ContentVersionSummary[];
+  lint_warnings?: DraftLintWarning[];
 }
 
 export interface ApprovalDecisionResponse {
@@ -218,6 +225,11 @@ export interface PublicationResponse {
   error?: string | null;
   created_at: string;
   published_at?: string | null;
+  schedule_info?: {
+    last_synced_at?: string | null;
+    next_sync_at?: string | null;
+    sync_attempt_count?: number;
+  };
 }
 
 export async function fetchWorkflowRunPublication(id: string): Promise<PublicationResponse> {
@@ -249,10 +261,21 @@ export interface StrategyItem {
     topics?: string[];
     tone?: string;
     voice_guidelines?: string;
+    discovery_interval_hours?: number;
     [key: string]: any;
   };
   enabled: boolean;
   sources: StrategySourceSummary[];
+  schedule_info?: {
+    interval_hours?: number | null;
+    is_scheduled?: boolean;
+    last_run?: {
+      completed_at?: string | null;
+      status?: string;
+      items_found?: number;
+      ideas_created?: number;
+    } | null;
+  };
   created_at: string;
   updated_at: string;
 }

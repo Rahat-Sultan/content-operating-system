@@ -33,6 +33,7 @@ export default function StrategyDetailPage({
     tone: string;
     voice_guidelines: string;
     voice_sample: string;
+    discovery_interval_hours: string;
     enabled: boolean;
     source_ids: string[];
   }>({
@@ -46,6 +47,7 @@ export default function StrategyDetailPage({
     tone: "",
     voice_guidelines: "",
     voice_sample: "",
+    discovery_interval_hours: "",
     enabled: true,
     source_ids: [],
   });
@@ -82,6 +84,10 @@ export default function StrategyDetailPage({
         tone: strategy.config?.tone || "",
         voice_guidelines: strategy.config?.voice_guidelines || "",
         voice_sample: strategy.config?.voice_sample || "",
+        discovery_interval_hours:
+          strategy.config?.discovery_interval_hours !== undefined
+            ? String(strategy.config.discovery_interval_hours)
+            : "",
         enabled: strategy.enabled,
         source_ids: strategy.sources?.map((s) => s.id) || [],
       });
@@ -153,6 +159,9 @@ export default function StrategyDetailPage({
         tone: formData.tone.trim() || undefined,
         voice_guidelines: formData.voice_guidelines.trim() || undefined,
         voice_sample: formData.voice_sample.trim() || undefined,
+        discovery_interval_hours: formData.discovery_interval_hours.trim()
+          ? parseFloat(formData.discovery_interval_hours.trim())
+          : undefined,
       },
       source_ids: formData.source_ids,
     };
@@ -384,6 +393,53 @@ export default function StrategyDetailPage({
               </dl>
             </section>
 
+            {/* Scheduled Discovery & Last Run (CP-2C.1) */}
+            <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-6" data-testid="discovery-schedule-card">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                  Discovery Schedule & Background Polling
+                </h3>
+                <span
+                  className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
+                    strategy.schedule_info?.is_scheduled
+                      ? "bg-indigo-950/60 text-indigo-300 border-indigo-800"
+                      : "bg-slate-800 text-slate-400 border-slate-700"
+                  }`}
+                  data-testid="schedule-status-badge"
+                >
+                  {strategy.schedule_info?.is_scheduled
+                    ? `Scheduled (Every ${strategy.schedule_info.interval_hours}h)`
+                    : "Schedule Disabled"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2 border-t border-slate-800/80">
+                <div>
+                  <div className="text-slate-500">Configured Interval</div>
+                  <div className="text-slate-200 font-medium mt-0.5" data-testid="schedule-interval-value">
+                    {strategy.schedule_info?.interval_hours
+                      ? `${strategy.schedule_info.interval_hours} hour(s)`
+                      : "Manual trigger only (interval not set)"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-500">Last Scheduled Run</div>
+                  <div className="text-slate-200 font-medium mt-0.5" data-testid="schedule-last-run-value">
+                    {strategy.schedule_info?.last_run ? (
+                      <span>
+                        {new Date(strategy.schedule_info.last_run.completed_at || "").toLocaleString()}{" "}
+                        <span className="text-slate-400 text-[11px]">
+                          ({strategy.schedule_info.last_run.items_found || 0} items fetched,{" "}
+                          {strategy.schedule_info.last_run.ideas_created || 0} ideas created)
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 italic">No scheduled runs recorded yet</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* Attached Sources */}
             <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
@@ -534,6 +590,27 @@ export default function StrategyDetailPage({
                   value={formData.voice_sample}
                   onChange={(e) => setFormData({ ...formData, voice_sample: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Scheduled Discovery Interval (Hours)
+                </label>
+                <p className="text-slate-500 text-[11px] mb-1.5">
+                  Interval in hours between automated background discovery runs (e.g. 1, 4, 24). Leave blank to disable automated scheduling.
+                </p>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="any"
+                  placeholder="e.g. 4 (leave blank for manual discovery only)"
+                  value={formData.discovery_interval_hours}
+                  onChange={(e) =>
+                    setFormData({ ...formData, discovery_interval_hours: e.target.value })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                  data-testid="schedule-interval-input"
                 />
               </div>
 

@@ -501,12 +501,19 @@ export default function WorkflowRunDetailPage({
                     <div className={`p-3 rounded-lg text-xs font-mono border ${
                       syncError.toLowerCase().includes("not yet available") || syncError.toLowerCase().includes("indexing")
                         ? "bg-amber-950/40 border-amber-800 text-amber-300"
+                        : syncError.toLowerCase().includes("not found")
+                        ? "bg-rose-950/50 border-rose-800 text-rose-300"
                         : "bg-rose-950/50 border-rose-800 text-rose-300"
                     }`}>
                       {syncError.toLowerCase().includes("not yet available") || syncError.toLowerCase().includes("indexing") ? (
                         <div className="flex items-center space-x-2">
                           <span>⏳</span>
                           <span>{syncError}</span>
+                        </div>
+                      ) : syncError.toLowerCase().includes("not found") ? (
+                        <div className="flex items-center space-x-2">
+                          <span>✕</span>
+                          <span>Permanent Error: Post not found on provider. Check external post ID.</span>
                         </div>
                       ) : (
                         <span>Sync Error: {syncError}</span>
@@ -568,11 +575,28 @@ export default function WorkflowRunDetailPage({
                             <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
                               Last Synced
                             </span>
-                            <span className="text-[11px] font-medium text-slate-300 block truncate" title={latestSnapshot?.collected_at || "Never"}>
-                              {latestSnapshot?.collected_at ? new Date(latestSnapshot.collected_at).toLocaleTimeString() : "Never"}
+                            <span className="text-[11px] font-medium text-slate-300 block truncate" data-testid="analytics-last-synced" title={publication.schedule_info?.last_synced_at || latestSnapshot?.collected_at || "Never"}>
+                              {publication.schedule_info?.last_synced_at
+                                ? new Date(publication.schedule_info.last_synced_at).toLocaleTimeString()
+                                : latestSnapshot?.collected_at
+                                ? new Date(latestSnapshot.collected_at).toLocaleTimeString()
+                                : "Never"}
                             </span>
                             <span className="text-[9px] text-slate-500 block">
                               {metrics.is_stub ? "Initial Stub" : metrics.provider || "Buffer"}
+                            </span>
+                          </div>
+                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                              Next Scheduled Sync
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-300 block truncate" data-testid="analytics-next-sync" title={publication.schedule_info?.next_sync_at || "Completed all steps"}>
+                              {publication.schedule_info?.next_sync_at
+                                ? new Date(publication.schedule_info.next_sync_at).toLocaleTimeString()
+                                : "Completed / None"}
+                            </span>
+                            <span className="text-[9px] text-slate-500 block">
+                              Attempt {publication.schedule_info?.sync_attempt_count ?? 0} of 6
                             </span>
                           </div>
                         </div>
@@ -670,6 +694,24 @@ export default function WorkflowRunDetailPage({
                   {draft.current_version.title}
                 </h3>
               )}
+
+              {/* Draft Lint Warnings Banner */}
+              {draft.current_version.lint_warnings && draft.current_version.lint_warnings.length > 0 && (
+                <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-800/80 text-amber-300 space-y-1.5 text-xs">
+                  <div className="flex items-center space-x-1.5 font-semibold text-amber-400 text-[11px] uppercase tracking-wider">
+                    <span>⚠</span>
+                    <span>Editorial Lint Warnings ({draft.current_version.lint_warnings.length})</span>
+                  </div>
+                  <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-amber-200/90 font-mono">
+                    {draft.current_version.lint_warnings.map((warn: any, idx: number) => (
+                      <li key={idx}>
+                        <span className="font-semibold capitalize text-amber-300">[{warn.category}]:</span> {warn.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="text-xs leading-relaxed text-slate-300 font-mono whitespace-pre-wrap">
                 {draft.current_version.body}
               </div>
