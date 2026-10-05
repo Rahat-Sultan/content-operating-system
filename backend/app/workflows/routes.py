@@ -170,8 +170,20 @@ def read_content_draft(
     id: UUID,
     db: Session = Depends(get_db),
 ):
+    from app.strategies.models import ContentStrategy
+    from app.workflows.draft_lint import lint_draft
+
     content, versions = get_draft_for_workflow_run(db, id)
+    run = db.query(WorkflowRun).filter(WorkflowRun.id == id).first()
+    voice_sample = None
+    if run and run.strategy_id:
+        strat = db.query(ContentStrategy).filter(ContentStrategy.id == run.strategy_id).first()
+        if strat and strat.config:
+            voice_sample = strat.config.get("voice_sample")
+
     current_ver = versions[0]
+    current_lint = lint_draft(current_ver.body, voice_sample=voice_sample)
+
     return ContentDraftResponse(
         content_id=content.id,
         workflow_run_id=content.workflow_run_id,
@@ -181,6 +193,7 @@ def read_content_draft(
             origin=current_ver.origin.value,
             title=current_ver.title,
             body=current_ver.body,
+            lint_warnings=current_lint,
             created_at=current_ver.created_at,
         ),
         versions=[
@@ -190,10 +203,12 @@ def read_content_draft(
                 origin=v.origin.value,
                 title=v.title,
                 body=v.body,
+                lint_warnings=lint_draft(v.body, voice_sample=voice_sample),
                 created_at=v.created_at,
             )
             for v in versions
         ],
+        lint_warnings=current_lint,
     )
 
 
@@ -229,5 +244,22 @@ def read_workflow_run_publication(
             detail=f"No publication found for workflow run {id}."
         )
 
-    return publication
+    from app.scheduler.service import get_publication_sync_schedule_info
+    from app.publishing.schemas import PublicationResponse
+    schedule_info = get_publication_sync_schedule_info(db, publication)
+
+    return PublicationResponse(
+        id=publication.id,
+        content_version_id=publication.content_version_id,
+        platform=publication.platform,
+        status=publication.status,
+        idempotency_key=publication.idempotency_key,
+        external_id=publication.external_id,
+        url=publication.url,
+        publication_metadata=publication.publication_metadata,
+        error=publication.error,
+        created_at=publication.created_at,
+        published_at=publication.published_at,
+        schedule_info=schedule_info,
+    )
 

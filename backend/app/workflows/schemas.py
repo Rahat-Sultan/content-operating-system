@@ -67,6 +67,7 @@ class ContentVersionSummary(BaseModel):
     origin: str
     title: str | None = None
     body: str
+    lint_warnings: list[dict[str, Any]] = []
     created_at: datetime
 
 
@@ -77,3 +78,4 @@ class ContentDraftResponse(BaseModel):
     workflow_run_id: UUID
     current_version: ContentVersionSummary
     versions: list[ContentVersionSummary]
+    lint_warnings: list[dict[str, Any]] = []

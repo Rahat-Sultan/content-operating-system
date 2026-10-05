@@ -89,10 +89,20 @@ def writer_node(state: ContentGraphState) -> dict:
         )
         db.add(version_record)
 
-        # 4. Mark workflow_runs status as NEEDS_REVIEW
+        # 4. Mark workflow_runs status as NEEDS_REVIEW and store draft lint warnings
+        from app.workflows.draft_lint import lint_draft
+        from app.strategies.models import ContentStrategy
+
+        strat = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id).first()
+        voice_sample = strat.config.get("voice_sample") if strat and strat.config else None
+        lint_results = lint_draft(draft_body, voice_sample=voice_sample)
+
         run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
         if run:
             run.status = WorkflowRunStatus.NEEDS_REVIEW
+            metadata = dict(run.run_metadata or {})
+            metadata["draft_lint_warnings"] = lint_results
+            run.run_metadata = metadata
 
         db.commit()
         db.refresh(version_record)
