@@ -19,6 +19,7 @@ class PublicationResponse(BaseModel):
     error: str | None = None
     created_at: datetime
     published_at: datetime | None = None
+    schedule_info: dict[str, Any] | None = None
 
 
 class AnalyticsResponse(BaseModel):
