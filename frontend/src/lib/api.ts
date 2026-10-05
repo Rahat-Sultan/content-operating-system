@@ -437,3 +437,55 @@ export async function syncPublicationAnalytics(publicationId: string): Promise<A
   }
   return data;
 }
+
+export interface MediaAsset {
+  id: string;
+  content_version_id: string;
+  type: string;
+  status: string;
+  storage_url: string;
+  mime_type: string;
+  width?: number | null;
+  height?: number | null;
+  alt_text?: string | null;
+  prompt: string;
+  provider: string;
+  provider_asset_id?: string | null;
+  asset_metadata: {
+    is_stub?: boolean;
+    size_bytes?: number;
+    generator?: string;
+    [key: string]: any;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export async function fetchVersionMedia(
+  contentId: string,
+  versionId: string
+): Promise<MediaAsset[]> {
+  const res = await fetch(`${API_BASE}/content/${contentId}/versions/${versionId}/media`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch media assets: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function generateVersionMedia(
+  contentId: string,
+  versionId: string,
+  prompt?: string,
+  regenerate: boolean = false
+): Promise<MediaAsset> {
+  const res = await fetch(`${API_BASE}/content/${contentId}/versions/${versionId}/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, regenerate }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to generate media asset");
+  }
+  return data;
+}

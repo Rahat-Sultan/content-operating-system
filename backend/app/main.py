@@ -10,6 +10,7 @@ from app.ideas.routes import router as ideas_router
 from app.sources.routes import router as sources_router
 from app.publishing.routes import router as publications_router
 from app.strategies.routes import router as strategies_router
+from app.media.routes import router as media_router
 from app.llm.openrouter_client import check_api_key_configuration
 
 
@@ -40,6 +41,7 @@ app.include_router(ideas_router, prefix="/api")
 app.include_router(sources_router, prefix="/api")
 app.include_router(publications_router, prefix="/api")
 app.include_router(strategies_router, prefix="/api")
+app.include_router(media_router, prefix="/api")
 
 
 

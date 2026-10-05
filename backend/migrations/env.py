@@ -28,6 +28,7 @@ from app.workflows import models as workflows_models  # noqa: F401
 from app.content import models as content_models  # noqa: F401
 from app.publishing import models as publishing_models  # noqa: F401
 from app.analytics import models as analytics_models  # noqa: F401
+from app.media import models as media_models  # noqa: F401
 
 target_metadata = Base.metadata
 

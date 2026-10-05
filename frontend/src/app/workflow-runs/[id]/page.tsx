@@ -13,6 +13,8 @@ import {
   fetchWorkflowRunPublication,
   fetchPublicationAnalytics,
   syncPublicationAnalytics,
+  fetchVersionMedia,
+  generateVersionMedia,
 } from "@/lib/api";
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
@@ -133,6 +135,39 @@ export default function WorkflowRunDetailPage({
     },
     onError: (err: any) => {
       setSyncError(err?.message || "Failed to sync metrics from provider.");
+    },
+  });
+
+  // 8. Version Media Assets
+  const currentVersionId = draft?.current_version?.id;
+  const contentId = draft?.content_id;
+
+  const {
+    data: mediaAssets,
+    isLoading: isMediaLoading,
+    refetch: refetchMedia,
+  } = useQuery({
+    queryKey: ["version-media", contentId, currentVersionId],
+    queryFn: () => fetchVersionMedia(contentId!, currentVersionId!),
+    enabled: !!contentId && !!currentVersionId,
+  });
+
+  // Generate Media Mutation
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const generateMediaMutation = useMutation({
+    mutationFn: async ({ regenerate = false }: { regenerate?: boolean } = {}) => {
+      if (!contentId || !currentVersionId) {
+        throw new Error("No draft content version loaded to generate media for.");
+      }
+      return generateVersionMedia(contentId, currentVersionId, undefined, regenerate);
+    },
+    onSuccess: () => {
+      setMediaError(null);
+      refetchMedia();
+      queryClient.invalidateQueries({ queryKey: ["version-media", contentId, currentVersionId] });
+    },
+    onError: (err: any) => {
+      setMediaError(err?.message || "Failed to generate image.");
     },
   });
 
@@ -609,6 +644,120 @@ export default function WorkflowRunDetailPage({
               <div className="text-xs leading-relaxed text-slate-300 font-mono whitespace-pre-wrap">
                 {draft.current_version.body}
               </div>
+            </div>
+
+            {/* Media Section */}
+            <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4 shadow">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Media (v{draft.current_version.version_number})
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Version-locked visual media asset
+                  </p>
+                </div>
+                <button
+                  onClick={() => generateMediaMutation.mutate({ regenerate: !!(mediaAssets && mediaAssets.length > 0) })}
+                  disabled={generateMediaMutation.isPending}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
+                >
+                  {generateMediaMutation.isPending ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1" />
+                      <span>Generating...</span>
+                    </>
+                  ) : (
+                    <span>{mediaAssets && mediaAssets.length > 0 ? "Regenerate Image" : "Generate Image"}</span>
+                  )}
+                </button>
+              </div>
+
+              {mediaError && (
+                <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs font-mono">
+                  Error: {mediaError}
+                </div>
+              )}
+
+              {/* Media Asset Preview & Details */}
+              {(() => {
+                const latestMedia = mediaAssets && mediaAssets.length > 0 ? mediaAssets[0] : null;
+
+                if (!latestMedia) {
+                  return (
+                    <div className="p-6 rounded-lg bg-slate-950/50 border border-slate-800/80 text-center space-y-2">
+                      <p className="text-xs text-slate-400">
+                        No image generated for ContentVersion v{draft.current_version.version_number} yet.
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Click "Generate Image" to create an editorial visual asset for review.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    <div className="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`http://localhost:8000${latestMedia.storage_url}`}
+                        alt={latestMedia.alt_text || "Generated media asset"}
+                        className="w-full max-h-96 object-contain bg-slate-950"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Type
+                        </span>
+                        <span className="text-slate-200 font-medium">
+                          {latestMedia.type}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Provider
+                        </span>
+                        <span className="text-indigo-300 font-mono text-[11px]">
+                          {latestMedia.provider}
+                        </span>
+                        {latestMedia.asset_metadata?.is_stub && (
+                          <span className="text-[9px] text-amber-400 block mt-0.5">test stub</span>
+                        )}
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Status
+                        </span>
+                        <span className="text-emerald-400 font-medium font-mono text-[11px]">
+                          {latestMedia.status}
+                        </span>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Generated At
+                        </span>
+                        <span className="text-slate-300 font-mono text-[11px]">
+                          {new Date(latestMedia.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {latestMedia.alt_text && (
+                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs">
+                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                          Alt Text
+                        </span>
+                        <span className="text-slate-300">
+                          {latestMedia.alt_text}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </section>
         )}

@@ -33,6 +33,8 @@ out/
 .pgdata/
 .pgsockets/
 .uvicorn/
+media_storage/
+backend/media_storage/
 
 
 # Logs
