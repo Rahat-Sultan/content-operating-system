@@ -67,7 +67,7 @@ export default function WorkflowRunDetailPage({
   });
 
   // 3. Research Information
-  const { data: research } = useQuery({
+  const { data: research, refetch: refetchResearch } = useQuery({
     queryKey: ["workflow-run-research", id],
     queryFn: () => fetchWorkflowRunResearch(id),
     enabled: !!run && (run.status === "NEEDS_REVIEW" || run.status === "COMPLETED" || run.status === "PUBLISHING" || run.status === "REJECTED"),
@@ -75,7 +75,7 @@ export default function WorkflowRunDetailPage({
   });
 
   // 4. Brief Information
-  const { data: brief } = useQuery({
+  const { data: brief, refetch: refetchBrief } = useQuery({
     queryKey: ["workflow-run-brief", id],
     queryFn: () => fetchWorkflowRunBrief(id),
     enabled: !!run && (run.status === "NEEDS_REVIEW" || run.status === "COMPLETED" || run.status === "PUBLISHING" || run.status === "REJECTED"),
@@ -98,7 +98,7 @@ export default function WorkflowRunDetailPage({
   });
 
   // 6. Publication Information
-  const { data: publication } = useQuery({
+  const { data: publication, refetch: refetchPublication } = useQuery({
     queryKey: ["workflow-run-publication", id],
     queryFn: () => fetchWorkflowRunPublication(id),
     enabled: !!run && (run.status === "COMPLETED" || run.status === "PUBLISHING" || run.status === "FAILED"),
@@ -251,10 +251,28 @@ export default function WorkflowRunDetailPage({
         </div>
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => refetch()}
-            className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+            onClick={async () => {
+              await Promise.all([
+                refetch(),
+                refetchDraft(),
+                refetchResearch(),
+                refetchBrief(),
+                refetchPublication(),
+                refetchAnalytics(),
+                refetchMedia(),
+                queryClient.invalidateQueries({ queryKey: ["workflow-run", id] }),
+                queryClient.invalidateQueries({ queryKey: ["workflow-run-draft", id] }),
+                queryClient.invalidateQueries({ queryKey: ["workflow-run-research", id] }),
+                queryClient.invalidateQueries({ queryKey: ["workflow-run-brief", id] }),
+                queryClient.invalidateQueries({ queryKey: ["workflow-run-publication", id] }),
+                queryClient.invalidateQueries({ queryKey: ["publication-analytics"] }),
+                queryClient.invalidateQueries({ queryKey: ["version-media"] }),
+              ]);
+            }}
+            className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center space-x-1 transition active:scale-95"
           >
-            Refresh
+            <span>↻</span>
+            <span>Refresh</span>
           </button>
         </div>
       </header>
@@ -480,8 +498,19 @@ export default function WorkflowRunDetailPage({
                   </div>
 
                   {syncError && (
-                    <div className="p-3 rounded-lg bg-rose-950/50 border border-rose-800 text-rose-300 text-xs font-mono">
-                      Sync Error: {syncError}
+                    <div className={`p-3 rounded-lg text-xs font-mono border ${
+                      syncError.toLowerCase().includes("not yet available") || syncError.toLowerCase().includes("indexing")
+                        ? "bg-amber-950/40 border-amber-800 text-amber-300"
+                        : "bg-rose-950/50 border-rose-800 text-rose-300"
+                    }`}>
+                      {syncError.toLowerCase().includes("not yet available") || syncError.toLowerCase().includes("indexing") ? (
+                        <div className="flex items-center space-x-2">
+                          <span>⏳</span>
+                          <span>{syncError}</span>
+                        </div>
+                      ) : (
+                        <span>Sync Error: {syncError}</span>
+                      )}
                     </div>
                   )}
 
