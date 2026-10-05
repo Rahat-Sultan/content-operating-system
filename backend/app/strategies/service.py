@@ -119,7 +119,11 @@ def update_strategy(
     return strategy
 
 
-def run_strategy_discovery(db: Session, strategy_id: UUID) -> dict[str, Any]:
+def run_strategy_discovery(
+    db: Session,
+    strategy_id: UUID,
+    skip_llm_if_no_new_items: bool = False,
+) -> dict[str, Any]:
     """
     Executes Discovery strictly for the specified Strategy:
     1. Loads the strategy and its attached Sources (isolated: ONLY this strategy's sources).
@@ -191,10 +195,11 @@ def run_strategy_discovery(db: Session, strategy_id: UUID) -> dict[str, Any]:
         total_new_items += len(inserted_source_items)
 
         # If new items exist, run scout & scoring for this Strategy
-        # If no new items exist (all already seen), we fall back to scout on the top recent source items
-        # so discovery produces relevant candidate ideas for the strategy
+        # If skip_llm_if_no_new_items is True, skip calling the LLM when no new items arrived
         items_for_scouting = inserted_source_items
         if not items_for_scouting:
+            if skip_llm_if_no_new_items:
+                continue
             recent_items = (
                 db.query(SourceItem)
                 .filter(SourceItem.source_id == source.id)

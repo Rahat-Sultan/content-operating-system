@@ -22,7 +22,12 @@ from app.strategies.service import (
 router = APIRouter(prefix="/strategies", tags=["strategies"])
 
 
-def _to_strategy_response(strategy, sources) -> StrategyResponse:
+def _to_strategy_response(strategy, sources, db: Session | None = None) -> StrategyResponse:
+    schedule_info = None
+    if db is not None:
+        from app.scheduler.service import get_strategy_discovery_schedule_info
+        schedule_info = get_strategy_discovery_schedule_info(db, strategy)
+
     return StrategyResponse(
         id=strategy.id,
         name=strategy.name,
@@ -39,6 +44,7 @@ def _to_strategy_response(strategy, sources) -> StrategyResponse:
             )
             for s in sources
         ],
+        schedule_info=schedule_info,
         created_at=strategy.created_at,
         updated_at=strategy.updated_at,
     )
@@ -56,7 +62,7 @@ def get_all_strategies(
     result = []
     for strat in strategies:
         sources = get_strategy_sources(db, strat.id)
-        result.append(_to_strategy_response(strat, sources))
+        result.append(_to_strategy_response(strat, sources, db=db))
     return result
 
 
@@ -77,7 +83,7 @@ def create_new_strategy(
         source_ids=request.source_ids,
     )
     sources = get_strategy_sources(db, strategy.id)
-    return _to_strategy_response(strategy, sources)
+    return _to_strategy_response(strategy, sources, db=db)
 
 
 @router.get("/{id}", response_model=StrategyResponse)
@@ -90,7 +96,7 @@ def get_single_strategy(
     """
     strategy = get_strategy(db, id)
     sources = get_strategy_sources(db, strategy.id)
-    return _to_strategy_response(strategy, sources)
+    return _to_strategy_response(strategy, sources, db=db)
 
 
 @router.patch("/{id}", response_model=StrategyResponse)
@@ -112,7 +118,7 @@ def update_existing_strategy(
         source_ids=request.source_ids,
     )
     sources = get_strategy_sources(db, strategy.id)
-    return _to_strategy_response(strategy, sources)
+    return _to_strategy_response(strategy, sources, db=db)
 
 
 @router.post("/{id}/discover", response_model=StrategyDiscoveryResult)
