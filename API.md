@@ -96,13 +96,24 @@ Manual edits create new versions.
 
 ---
 
-## 8. Publications
+## 8. Publications & Analytics
 
 ```http
 GET /api/publications/{id}
 GET /api/publications/{id}/analytics
+POST /api/publications/{id}/analytics/sync
 GET /api/workflow-runs/{id}/publication
 ```
+
+- `POST /api/publications/{id}/analytics/sync`: Manually triggers metrics sync against the analytics provider (e.g. Buffer). Returns HTTP 201 on success with new snapshot, HTTP 409 if metrics are not yet available (propagation delay), or HTTP 404 if the post is not found.
+- `GET /api/workflow-runs/{id}/publication`: Returns the publication record with `schedule_info`:
+  - `last_synced_at`: ISO timestamp of most recent successful sync.
+  - `next_sync_at`: ISO timestamp of next scheduled sync attempt in backoff ladder.
+  - `sync_attempt_count`: Total sync attempts executed so far.
+- `GET /api/strategies/{id}`: Returns strategy with `schedule_info`:
+  - `interval_hours`: Configured discovery interval in hours.
+  - `is_scheduled`: Boolean indicating if automatic background discovery is active.
+  - `last_run`: Status, timestamp, items found, and ideas created during the last scheduled run.
 
 ---
 

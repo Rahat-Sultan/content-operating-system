@@ -181,3 +181,35 @@ Use OpenRouter (`https://openrouter.ai/api/v1/chat/completions`) as the primary 
 Reason:
 
 NVIDIA NIM direct API (`build.nvidia.com`) is regionally restricted/blocked in this deployment location. OpenRouter provides reliable, unrestricted access to top open models (including NVIDIA Nemotron) without region locks, ensuring resilient structured discovery and scoring workflows.
+
+---
+
+## ADR-016 — Durable PostgreSQL-Backed Polling Scheduler for Discovery & Analytics
+
+Decision:
+
+Implement a dedicated worker process (`python -m app.scheduler`) polling PostgreSQL using an explicit jobs table (`scheduled_jobs`) with atomic claims via `SELECT ... FOR UPDATE SKIP LOCKED` (or conditional atomic updates with timeout-based claim expiry).
+
+Reason:
+
+Per AGENTS.md Rule 10 ("Don't add infrastructure because it's interesting") and Rule 11, we avoid introducing Redis, Celery, or new daemon services. In-process FastAPI background tasks do not survive server restarts, do not support cross-worker coordination, and cannot prevent duplicate runs when multiple backend workers run. APScheduler requires either an in-memory job store (lost on restart) or an external database plugin. A native PostgreSQL table with atomic row-level locks provides:
+1. Complete restart durability across crashes.
+2. Safe multi-worker concurrency with zero double-execution.
+3. Automatic recovery of stale claimed jobs via heartbeat/lease timeouts.
+
+Rejected alternatives:
+- Redis + Celery: Rejected as unnecessary infrastructure overhead for V0.
+- APScheduler: Rejected to avoid unnecessary framework dependencies when PostgreSQL transactional locks (`SKIP LOCKED`) cleanly solve the claim problem in plain Python.
+- FastAPI BackgroundTasks: Rejected because background tasks are ephemeral and killed on uvicorn restart.
+
+---
+
+## ADR-017 — Analytics Feedback Loop Deferred
+
+Decision:
+
+Deliberately defer feeding analytics metrics directly back into idea discovery/scoring heuristics.
+
+Reason:
+
+Currently there are only a handful of published posts, which provides insufficient signal for statistical scoring, and metrics on recent posts are still stabilizing. This feedback loop will be revisited when there are roughly 20 or more published posts with settled performance metrics.

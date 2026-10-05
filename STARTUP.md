@@ -127,11 +127,39 @@ Open `http://localhost:3000` in the browser. Always port 3000.
 
 ---
 
-## 7. Clean Shutdown Procedure
+## 7. Scheduler Startup & Testing (Background Worker)
+
+The background worker automatically polls PostgreSQL for due scheduled discoveries and analytics sync jobs.
+
+### Scheduler Startup
+Open a dedicated terminal:
+```bash
+cd ~/BxTrackSolution/content-os/backend
+source ../.venv/bin/activate
+python -m app.scheduler
+```
+
+Environment variables:
+- `SCHEDULER_POLL_INTERVAL`: Polling interval in seconds (default `2.0`).
+- `MIN_DISCOVERY_INTERVAL_HOURS`: Minimum allowed discovery interval for strategies (default `1.0`, overridable to `0.0` for testing).
+
+### Running Scheduler Tests
+```bash
+cd ~/BxTrackSolution/content-os/backend
+PYTHONPATH=. ../.venv/bin/python tests/test_schedule_calculator.py
+PYTHONPATH=. ../.venv/bin/python tests/test_scheduled_discovery_auto.py
+PYTHONPATH=. ../.venv/bin/python tests/test_scheduled_discovery_concurrency.py
+PYTHONPATH=. ../.venv/bin/python tests/test_scheduled_analytics_sync.py
+```
+
+---
+
+## 8. Clean Shutdown Procedure
 
 1. **Frontend**: Stop Next.js process (`Ctrl+C` in the frontend terminal).
 2. **Backend**: Stop uvicorn process (`Ctrl+C` in the backend terminal).
-3. **PostgreSQL**: Stop local postgres cleanly:
+3. **Scheduler**: Stop scheduler worker (`Ctrl+C` in the scheduler terminal).
+4. **PostgreSQL**: Stop local postgres cleanly:
    ```bash
    /usr/lib/postgresql/18/bin/pg_ctl -D /home/borat/BxTrackSolution/content-os/.pgdata stop
    ```
@@ -139,7 +167,7 @@ Open `http://localhost:3000` in the browser. Always port 3000.
 
 ---
 
-## 8. Troubleshooting Guide
+## 9. Troubleshooting Guide
 
 ### Issue: "Database appears empty" or "table does not exist"
 - **Cause**: You connected via TCP `localhost:5432` or default socket to the empty system PostgreSQL instance.

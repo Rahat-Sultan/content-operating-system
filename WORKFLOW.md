@@ -198,3 +198,31 @@ PUBLISHING (atomic status update)
 1. **Deterministic Idempotency Key**: `f"{content_version_id}:{platform}"` (retries MUST reuse the same key).
 2. **PostgreSQL Protection**: `UNIQUE(idempotency_key)` protects against concurrent dispatch races. If two workers invoke publish concurrently, the unique constraint ensures only one row is created; the secondary caller gracefully receives and returns the winning publication.
 3. **Version Lock**: Publishing strictly verifies that `ContentVersion` belongs to the `WorkflowRun`, has status `APPROVED`, and matches the latest version. Stale or rejected versions can never publish.
+
+---
+
+## 11. Scheduled Discovery & Scheduled Analytics Sync
+
+Scheduled operations run via a durable PostgreSQL polling scheduler (`python -m app.scheduler`) backed by the `scheduled_jobs` table.
+
+```text
+Scheduled Worker Process (python -m app.scheduler)
+       ↓
+Claim due job: SELECT ... FOR UPDATE SKIP LOCKED
+       ↓
+Execute side-effect-light service logic
+       ↓
+Update status (COMPLETED / FAILED) + error / result
+```
+
+### Discovery Scheduling
+- Configured per-strategy via `config.discovery_interval_hours`. Minimum interval enforced (default 1 hour, overridable via `MIN_DISCOVERY_INTERVAL_HOURS` for tests).
+- Discovery is strictly read-only signal ingestion + candidate idea scoring; it never automatically initiates production, approvals, or publishing.
+- If no new items are fetched from attached feeds, LLM scoring is safely skipped to conserve token budget.
+
+### Analytics Sync Backoff
+- For published posts with valid external post IDs, metrics are synced on an exponential backoff schedule: 15m, 1h, 6h, 24h, 72h, 7d (stopping after 6 attempts).
+- `MetricsNotAvailableError` (HTTP 409 propagation delay) is treated as a normal non-error outcome that schedules the next backoff attempt without writing a snapshot.
+- Stub/mock publications (e.g. `linkedin_*`, `test-ext-*`) are ignored by the scheduler.
+- Multi-process worker concurrency is guaranteed with `SKIP LOCKED`. Worker crash recovery uses lease timeout reset after 5 minutes.
+
