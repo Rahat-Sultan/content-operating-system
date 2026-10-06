@@ -70,6 +70,90 @@ function isActive(item: NavItem, pathname: string, query: URLSearchParams): bool
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
+function NavRow({
+  item,
+  pathname,
+  query,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  query: URLSearchParams;
+  onNavigate?: () => void;
+}) {
+  // Submenus start closed and open only when clicked.
+  const [open, setOpen] = useState(false);
+  const active = isActive(item, pathname, query);
+  const childActive = item.children?.some((c) => isActive(c, pathname, query)) ?? false;
+
+  if (!item.children) {
+    return (
+      <Link
+        href={item.href}
+        onClick={onNavigate}
+        aria-current={active ? "page" : undefined}
+        className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+          active ? "bg-accent/15 text-accent-text" : "text-muted hover:bg-raised hover:text-body-strong"
+        }`}
+      >
+        {item.label}
+      </Link>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+          childActive ? "text-accent-text" : "text-muted hover:bg-raised hover:text-body-strong"
+        }`}
+      >
+        <span>{item.label}</span>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="mt-1 space-y-0.5 border-l border-line-strong ml-5 pl-2">
+          {item.children.map((child) => {
+            const childNow = isActive(child, pathname, query);
+            return (
+              <li key={child.href}>
+                <Link
+                  href={child.href}
+                  onClick={onNavigate}
+                  aria-current={childNow ? "page" : undefined}
+                  className={`flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    childNow
+                      ? "bg-accent text-strong shadow-sm shadow-accent/20"
+                      : "text-subtle hover:bg-raised hover:text-body-strong"
+                  }`}
+                >
+                  {child.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function NavList({
   pathname,
   query,
@@ -84,47 +168,11 @@ function NavList({
       {NAV.map((group) => (
         <div key={group.label}>
           <p className="cos-label px-3 pb-2">{group.label}</p>
-          <ul className="space-y-0.5">
-            {group.items.map((item) => {
-              const active = isActive(item, pathname, query);
-              const childActive = item.children?.some((c) => isActive(c, pathname, query));
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    aria-current={active && !childActive ? "page" : undefined}
-                    className={`flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      active ? "bg-accent/15 text-accent-text" : "text-muted hover:bg-raised hover:text-body-strong"
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                  {item.children && (active || childActive) && (
-                    <ul className="mt-0.5 ml-4 space-y-0.5 border-l border-line pl-2">
-                      {item.children.map((child) => {
-                        const childNow = isActive(child, pathname, query);
-                        return (
-                          <li key={child.href}>
-                            <Link
-                              href={child.href}
-                              onClick={onNavigate}
-                              aria-current={childNow ? "page" : undefined}
-                              className={`block rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                                childNow ? "text-accent-text" : "text-subtle hover:text-body-strong"
-                              }`}
-                            >
-                              {child.label}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <div className="space-y-0.5">
+            {group.items.map((item) => (
+              <NavRow key={item.label} item={item} pathname={pathname} query={query} onNavigate={onNavigate} />
+            ))}
+          </div>
         </div>
       ))}
     </nav>

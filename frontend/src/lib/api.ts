@@ -857,3 +857,23 @@ export async function retryPublish(workflowRunId: string): Promise<WorkflowRunRe
   }
   return res.json();
 }
+
+export interface SourceSuggestion {
+  name: string;
+  url: string;
+  topic: string;
+}
+
+export async function fetchSourceSuggestions(): Promise<SourceSuggestion[]> {
+  const res = await apiFetch(`${API_BASE}/sources/suggestions`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch suggestions: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function selectIdea(id: string) {
+  const res = await apiFetch(`${API_BASE}/ideas/${id}/select`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not select the idea.");
+  return res.json();
+}

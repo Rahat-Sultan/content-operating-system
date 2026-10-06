@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PlatformBadge } from "@/components/PlatformBadge";
-import { archiveIdea, deleteIdea, fetchIdeas, IdeaItem, restoreIdea } from "@/lib/api";
+import { archiveIdea, deleteIdea, fetchIdeas, IdeaItem, restoreIdea, selectIdea } from "@/lib/api";
 
 // Board columns: one per stage. Archived (REJECTED) ideas live in their own tab.
 const STAGES: { status: string; label: string }[] = [
@@ -20,8 +20,10 @@ function scoreOf(i: IdeaItem) {
 }
 
 export default function IdeasPage() {
+  // The view lives in the URL, so the menu and the tabs always agree.
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const [view, setView] = useState<"board" | "archive">(searchParams.get("view") === "archive" ? "archive" : "board");
+  const view: "board" | "archive" = searchParams.get("view") === "archive" ? "archive" : "board";
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
 
@@ -35,7 +37,8 @@ export default function IdeasPage() {
   const shown = view === "archive" ? archived : active;
 
   const act = useMutation({
-    mutationFn: async ({ id, kind }: { id: string; kind: "archive" | "restore" | "delete" }) => {
+    mutationFn: async ({ id, kind }: { id: string; kind: "select" | "archive" | "restore" | "delete" }) => {
+      if (kind === "select") return selectIdea(id);
       if (kind === "archive") return archiveIdea(id);
       if (kind === "restore") return restoreIdea(id);
       // Stop the running work first. If a step is still finishing, wait and try again.
@@ -96,6 +99,15 @@ export default function IdeasPage() {
           {rowError[idea.id] && <span className="mr-auto text-[11px] text-rose-400">{rowError[idea.id]}</span>}
           {view === "board" ? (
             <>
+            {idea.status === "NEW" && (
+              <button
+                onClick={() => act.mutate({ id: idea.id, kind: "select" })}
+                disabled={act.isPending}
+                className="px-2 py-0.5 rounded text-[11px] bg-accent text-strong hover:bg-accent-hover disabled:opacity-50"
+              >
+                Select
+              </button>
+            )}
             <button
               onClick={() => act.mutate({ id: idea.id, kind: "archive" })}
               disabled={act.isPending}
@@ -161,7 +173,7 @@ export default function IdeasPage() {
                   key={v}
                   role="tab"
                   aria-selected={view === v}
-                  onClick={() => setView(v)}
+                  onClick={() => router.push(v === "archive" ? "/ideas?view=archive" : "/ideas")}
                   data-testid={`ideas-view-${v}`}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                     view === v ? "bg-violet-600 text-strong" : "text-muted hover:text-body-strong"

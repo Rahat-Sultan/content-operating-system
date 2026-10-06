@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { fetchSources, createSource, SourceOption, CreateSourcePayload } from "@/lib/api";
+import { fetchSources, createSource, fetchSourceSuggestions, SourceOption, CreateSourcePayload } from "@/lib/api";
 
 export default function SourcesPage() {
   const queryClient = useQueryClient();
@@ -31,6 +31,21 @@ export default function SourcesPage() {
   } = useQuery({
     queryKey: ["sources"],
     queryFn: fetchSources,
+  });
+
+  const { data: suggestions } = useQuery({
+    queryKey: ["source-suggestions"],
+    queryFn: fetchSourceSuggestions,
+  });
+
+  const addSuggestion = useMutation({
+    mutationFn: (s: { name: string; url: string; topic: string }) =>
+      createSource({ name: s.name, url: s.url, source_type: "rss", config: { topic: s.topic } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+      queryClient.invalidateQueries({ queryKey: ["source-suggestions"] });
+      queryClient.invalidateQueries({ queryKey: ["available-sources"] });
+    },
   });
 
   const createMutation = useMutation({
@@ -117,6 +132,34 @@ export default function SourcesPage() {
           <div className="my-6 p-4 rounded-lg bg-rose-950/40 border border-rose-800 text-rose-300 text-sm">
             Failed to load sources: {(error as Error)?.message || "Unknown error"}
           </div>
+        )}
+
+        {/* Suggested feeds this account does not have yet */}
+        {suggestions && suggestions.length > 0 && (
+          <section data-testid="source-suggestions" className="mt-6 space-y-3">
+            <div>
+              <h3 className="cos-label">Suggested sources</h3>
+              <p className="text-xs text-muted mt-1">Feeds that fit this niche. Add the ones you want to search.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {suggestions.map((s) => (
+                <div key={s.url} className="cos-card p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-body-strong truncate">{s.name}</p>
+                    <p className="text-[11px] text-subtle">{s.topic}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addSuggestion.mutate(s)}
+                    disabled={addSuggestion.isPending}
+                    className="cos-btn shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Sources List */}
