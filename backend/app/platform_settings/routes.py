@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.platform_settings.service import platform_views, test_platform, update_platform
 
-router = APIRouter(prefix="/settings/platforms", tags=["settings"])
+from app.settings_security.deps import settings_session
+
+router = APIRouter(prefix="/settings/platforms", tags=["settings"], dependencies=[Depends(settings_session)])
 
 
 class PlatformSettingsIn(BaseModel):

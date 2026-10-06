@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     # Public HTTPS base URL where media files are reachable. Buffer fetches images from
     # this URL itself, so localhost will never work. Example: https://media.example.com
     media_public_base_url: str = ""
+    # Fernet key that encrypts API keys saved from the Settings page. Required to save keys.
+    settings_encryption_key: str = ""
 
 
 settings = Settings()

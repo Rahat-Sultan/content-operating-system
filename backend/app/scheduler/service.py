@@ -402,6 +402,8 @@ class JobScheduler:
         db = SessionLocal()
         try:
             write_heartbeat(db, self.worker_id)
+            from app.settings_security.service import apply_saved_keys
+            apply_saved_keys(db)  # pick up keys changed in the Settings page
             self.recover_stale_claims(db)
             self.enqueue_due_discovery_jobs(db)
             self.enqueue_due_analytics_sync_jobs(db)

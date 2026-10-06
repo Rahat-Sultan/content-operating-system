@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppNav } from "@/components/AppNav";
 import { PlatformLogo } from "@/components/PlatformBadge";
 import {
+  ApiKeyState,
+  fetchApiKeys,
   fetchPlatformSettings,
+  fetchSettingsAuth,
+  loginSettings,
+  logoutSettings,
   PlatformSetting,
+  removeApiKey,
+  saveApiKey,
   savePlatformSettings,
+  setupSettingsPassword,
   testPlatformConnection,
 } from "@/lib/api";
 
@@ -154,11 +162,180 @@ function PlatformCard({ p }: { p: PlatformSetting }) {
   );
 }
 
-export default function SettingsPage() {
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["platform-settings"],
-    queryFn: fetchPlatformSettings,
+function ApiKeyRow({ k }: { k: ApiKeyState }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: () => saveApiKey(k.name, value),
+    onSuccess: () => {
+      setValue("");
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+    },
+    onError: (e: any) => setError(e.message),
   });
+  const remove = useMutation({
+    mutationFn: () => removeApiKey(k.name),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+    },
+    onError: (e: any) => setError(e.message),
+  });
+  return (
+    <div className="cos-card p-4 space-y-3" data-testid={`key-${k.name}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-strong text-sm">{k.label}</h3>
+          <p className="font-mono text-[11px] text-subtle">{k.name}</p>
+        </div>
+        <span className={`px-2 py-0.5 rounded border text-[11px] font-semibold ${k.is_set ? "border-emerald-700 text-emerald-300 bg-emerald-950/40" : "border-line-strong text-muted bg-raised"}`}>
+          {k.is_set ? `Set · ends …${k.last4 ?? ""}` : "Not set"}
+        </span>
+      </div>
+      <p className="text-[11px] text-subtle">
+        {k.saved_in_app
+          ? "Saved in the app (encrypted)."
+          : k.from_env
+          ? "Set in backend/.env. Saving here overrides it."
+          : "Not set anywhere yet."}
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="password"
+          autoComplete="off"
+          aria-label={`New ${k.label} key`}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={k.is_set ? "Enter a new key to replace it" : "Paste the key"}
+          className="cos-input font-mono"
+        />
+        <button className="cos-btn-primary whitespace-nowrap" disabled={!value.trim() || save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? "Saving…" : "Save key"}
+        </button>
+        {k.saved_in_app && (
+          <button className="cos-btn-danger whitespace-nowrap" disabled={remove.isPending} onClick={() => remove.mutate()}>
+            Remove
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-bad">{error}</p>}
+    </div>
+  );
+}
+
+function SettingsContent({ onLock }: { onLock: () => void }) {
+  const queryClient = useQueryClient();
+  const { data: keys, error: keysError } = useQuery({ queryKey: ["api-keys"], queryFn: fetchApiKeys });
+  const { data, isLoading, isError, error } = useQuery({ queryKey: ["platform-settings"], queryFn: fetchPlatformSettings });
+  // The server answers 401 once the session has ended. Go back to the password form.
+  useEffect(() => {
+    const msg = String((keysError as Error | null)?.message ?? (error as Error | null)?.message ?? "");
+    if (msg.includes("session has ended") || msg.includes("Settings are locked")) {
+      queryClient.invalidateQueries({ queryKey: ["settings-auth"] });
+    }
+  }, [keysError, error, queryClient]);
+  return (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-strong tracking-tight">Settings</h2>
+          <p className="text-sm text-muted mt-1">
+            Your API keys and platforms. This session ends when you close the browser, or after 8 hours.
+          </p>
+        </div>
+        <button className="cos-btn" onClick={onLock}>Lock settings</button>
+      </div>
+
+      <section className="space-y-3">
+        <h3 className="cos-label">API keys</h3>
+        <p className="text-xs text-muted">
+          Keys are encrypted before they are stored. Once saved, a key is never shown again; only its last four characters.
+        </p>
+        {keysError && <p className="text-sm text-bad">{(keysError as Error).message}</p>}
+        {keys?.map((k) => <ApiKeyRow key={k.name} k={k} />)}
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="cos-label">Platforms</h3>
+        <p className="text-sm text-muted">
+          A platform is used only when it is turned on, has a channel, and its token is set above or in <code className="font-mono">backend/.env</code>.
+        </p>
+        {isLoading && <p className="text-sm text-subtle">Loading…</p>}
+        {isError && <p className="text-sm text-bad">{(error as Error).message}</p>}
+        {data?.map((p) => <PlatformCard key={p.key} p={p} />)}
+      </section>
+    </>
+  );
+}
+
+function PasswordGate({ configured, lockedUntil, onDone }: { configured: boolean; lockedUntil: string | null; onDone: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const busy = useMutation({
+    mutationFn: async () => {
+      if (!configured) {
+        if (password !== confirm) throw new Error("The two passwords do not match.");
+        await setupSettingsPassword(password);
+      }
+      await loginSettings(password);
+    },
+    onSuccess: () => { setError(null); setPassword(""); setConfirm(""); onDone(); },
+    onError: (e: any) => setError(e.message),
+  });
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    busy.mutate();
+  }
+  const locked = lockedUntil && new Date(lockedUntil) > new Date();
+  return (
+    <form onSubmit={submit} className="cos-card p-6 max-w-md mx-auto space-y-4" data-testid="settings-gate">
+      <div>
+        <h2 className="text-lg font-semibold text-strong">{configured ? "Enter the Settings password" : "Create a Settings password"}</h2>
+        <p className="text-xs text-muted mt-1">
+          {configured
+            ? "API keys and platform settings are locked. You will be asked again next time you open Settings."
+            : "This password protects your API keys. Use at least 10 characters. It cannot be recovered; if you forget it, the keys must be re-entered from .env."}
+        </p>
+      </div>
+      <div>
+        <span className="cos-label">Password</span>
+        <input type="password" autoComplete={configured ? "current-password" : "new-password"} className="cos-input mt-1"
+          value={password} onChange={(e) => setPassword(e.target.value)} disabled={!!locked} />
+      </div>
+      {!configured && (
+        <div>
+          <span className="cos-label">Confirm password</span>
+          <input type="password" autoComplete="new-password" className="cos-input mt-1"
+            value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </div>
+      )}
+      {locked && <p className="text-xs text-warn">Too many wrong attempts. Try again after {new Date(lockedUntil!).toLocaleTimeString()}.</p>}
+      {error && <p className="text-xs text-bad">{error}</p>}
+      <button type="submit" className="cos-btn-primary w-full" disabled={!password || busy.isPending || !!locked}>
+        {busy.isPending ? "Checking…" : configured ? "Unlock" : "Set password and continue"}
+      </button>
+    </form>
+  );
+}
+
+export default function SettingsPage() {
+  const queryClient = useQueryClient();
+  const { data: auth, isLoading, isError, error } = useQuery({
+    queryKey: ["settings-auth"],
+    queryFn: fetchSettingsAuth,
+    refetchOnWindowFocus: true,
+  });
+
+  async function lock() {
+    await logoutSettings();
+    queryClient.removeQueries({ queryKey: ["api-keys"] });
+    queryClient.removeQueries({ queryKey: ["platform-settings"] });
+    queryClient.invalidateQueries({ queryKey: ["settings-auth"] });
+  }
 
   return (
     <div className="min-h-screen bg-canvas text-body-strong">
@@ -173,18 +350,17 @@ export default function SettingsPage() {
         <AppNav />
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-strong tracking-tight">Platforms</h2>
-          <p className="text-sm text-muted mt-1">
-            Set up each platform you publish to. A platform is used only when it is turned on, has a channel,
-            and its token is in <code className="font-mono">backend/.env</code>. Tokens are never shown here.
-          </p>
-        </div>
-
-        {isLoading && <p className="text-sm text-subtle">Loading…</p>}
+      <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+        {isLoading && <p className="text-sm text-subtle">Checking access…</p>}
         {isError && <p className="text-sm text-bad">{(error as Error).message}</p>}
-        {data?.map((p) => <PlatformCard key={p.key} p={p} />)}
+        {auth && !auth.unlocked && (
+          <PasswordGate
+            configured={auth.configured}
+            lockedUntil={auth.locked_until}
+            onDone={() => queryClient.invalidateQueries({ queryKey: ["settings-auth"] })}
+          />
+        )}
+        {auth?.unlocked && <SettingsContent onLock={lock} />}
       </main>
     </div>
   );

@@ -699,7 +699,7 @@ export interface PlatformSetting {
 }
 
 export async function fetchPlatformSettings(): Promise<PlatformSetting[]> {
-  const res = await fetch(`${API_BASE}/settings/platforms`);
+  const res = await settingsCall(`/settings/platforms`);
   if (!res.ok) throw await errorFrom(res, "Could not load platform settings.");
   return res.json();
 }
@@ -708,7 +708,7 @@ export async function savePlatformSettings(
   key: string,
   body: { enabled: boolean; display_name: string | null; channel_id: string | null; notes: string | null }
 ): Promise<PlatformSetting> {
-  const res = await fetch(`${API_BASE}/settings/platforms/${key}`, {
+  const res = await settingsCall(`/settings/platforms/${key}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -718,7 +718,72 @@ export async function savePlatformSettings(
 }
 
 export async function testPlatformConnection(key: string): Promise<{ ok: boolean; message: string }> {
-  const res = await fetch(`${API_BASE}/settings/platforms/${key}/test`, { method: "POST" });
+  const res = await settingsCall(`/settings/platforms/${key}/test`, { method: "POST" });
   if (!res.ok) throw await errorFrom(res, "Test failed.");
   return res.json();
+}
+
+// ---------- Settings access (password and session) ----------
+
+export interface SettingsAuthState {
+  configured: boolean;
+  unlocked: boolean;
+  locked_until: string | null;
+}
+
+async function settingsCall(path: string, init?: RequestInit): Promise<Response> {
+  // credentials: include sends the Settings session cookie, which the browser drops when it closes.
+  return fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
+}
+
+export async function fetchSettingsAuth(): Promise<SettingsAuthState> {
+  const res = await settingsCall("/settings/auth/status");
+  if (!res.ok) throw await errorFrom(res, "Could not check Settings access.");
+  return res.json();
+}
+
+export async function setupSettingsPassword(password: string): Promise<void> {
+  const res = await settingsCall("/settings/auth/setup", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not set the password.");
+}
+
+export async function loginSettings(password: string): Promise<void> {
+  const res = await settingsCall("/settings/auth/login", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not sign in.");
+}
+
+export async function logoutSettings(): Promise<void> {
+  await settingsCall("/settings/auth/logout", { method: "POST" });
+}
+
+export interface ApiKeyState {
+  name: string;
+  label: string;
+  saved_in_app: boolean;
+  last4: string | null;
+  from_env: boolean;
+  is_set: boolean;
+  updated_at: string | null;
+}
+
+export async function fetchApiKeys(): Promise<ApiKeyState[]> {
+  const res = await settingsCall("/settings/keys");
+  if (!res.ok) throw await errorFrom(res, "Could not load API keys.");
+  return res.json();
+}
+
+export async function saveApiKey(name: string, value: string): Promise<void> {
+  const res = await settingsCall(`/settings/keys/${name}`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not save the key.");
+}
+
+export async function removeApiKey(name: string): Promise<void> {
+  const res = await settingsCall(`/settings/keys/${name}`, { method: "DELETE" });
+  if (!res.ok) throw await errorFrom(res, "Could not remove the key.");
 }
