@@ -73,9 +73,7 @@ export default function SourcesPage() {
       {/* Top Navbar */}
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
-          <div className="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
-            C
-          </div>
+          <img src="/logo.svg" alt="Content OS" className="h-8 w-8 shrink-0" />
           <div>
             <h1 className="text-lg font-semibold text-white tracking-tight">Content OS</h1>
             <p className="text-xs text-slate-400">Autonomous Content Intelligence Engine</p>

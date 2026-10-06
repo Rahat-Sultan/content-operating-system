@@ -32,7 +32,7 @@ def _with_platforms(db: Session, ideas: list) -> list[IdeaResponse]:
 @router.get("", response_model=list[IdeaResponse])
 def get_all_ideas(
     status: IdeaStatus | None = Query(None, description="Filter by IdeaStatus"),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     strategy_id: UUID | None = Query(None, description="Only ideas from this strategy"),
     db: Session = Depends(get_db),
 ):

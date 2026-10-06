@@ -98,8 +98,9 @@ export interface ApprovalDecisionResponse {
   feedback?: string | null;
 }
 
-export async function fetchIdeas(status?: string, strategyId?: string): Promise<IdeaItem[]> {
+export async function fetchIdeas(status?: string, strategyId?: string, limit?: number): Promise<IdeaItem[]> {
   const params = new URLSearchParams();
+  if (limit) params.set("limit", String(limit));
   if (status && status !== "ALL") params.set("status", status);
   if (strategyId) params.set("strategy_id", strategyId);
   const url = params.toString() ? `${API_BASE}/ideas?${params.toString()}` : `${API_BASE}/ideas`;
