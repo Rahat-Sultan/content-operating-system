@@ -11,6 +11,7 @@ import {
   StrategyItem,
   UpdateStrategyPayload,
   StrategyDiscoveryResult,
+  fetchIdeas,
 } from "@/lib/api";
 
 export default function StrategyDetailPage({
@@ -107,6 +108,12 @@ export default function StrategyDetailPage({
     },
   });
 
+  // Ideas this strategy has produced. Same blocks as the Ideas page, linking to the same /ideas/{id}.
+  const { data: strategyIdeas } = useQuery({
+    queryKey: ["ideas-by-strategy", id],
+    queryFn: () => fetchIdeas("ALL", id),
+  });
+
   const discoveryMutation = useMutation({
     mutationFn: () => runStrategyDiscovery(id),
     onSuccess: (result: StrategyDiscoveryResult) => {
@@ -114,6 +121,7 @@ export default function StrategyDetailPage({
         `Discovery completed: Synced ${result.sources_synced} source(s), fetched ${result.items_fetched} item(s), created ${result.ideas_created_count} idea(s).`
       );
       queryClient.invalidateQueries({ queryKey: ["ideas"] });
+      queryClient.invalidateQueries({ queryKey: ["ideas-by-strategy", id] });
     },
     onError: (err: any) => {
       setFormError(err.message || "Failed to run discovery for strategy");
@@ -474,6 +482,51 @@ export default function StrategyDetailPage({
               ) : (
                 <div className="p-4 border border-dashed border-slate-800 rounded-lg text-center text-slate-500 text-xs">
                   No sources attached to this strategy. Click "Edit Configuration" to attach sources.
+                </div>
+              )}
+            </section>
+
+            {/* Ideas from this strategy (after discovery) */}
+            <section data-testid="strategy-ideas" className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                  Ideas from this strategy ({strategyIdeas?.length ?? 0})
+                </h3>
+                <Link href="/ideas" className="text-xs text-indigo-400 hover:underline">All ideas →</Link>
+              </div>
+              {strategyIdeas && strategyIdeas.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {[...strategyIdeas]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .slice(0, 12)
+                    .map((idea) => (
+                      <Link
+                        key={idea.id}
+                        href={`/ideas/${idea.id}`}
+                        data-testid="strategy-idea-card"
+                        className="group block p-4 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                              <span className="px-2 py-0.5 rounded border border-slate-700 text-slate-300">{idea.status}</span>
+                              <span>{new Date(idea.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                            </div>
+                            <h4 className="text-sm font-semibold text-slate-100 group-hover:text-indigo-400 transition-colors truncate">{idea.title}</h4>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Score</span>
+                            <span className="text-base font-bold text-emerald-400">
+                              {idea.final_score !== null && idea.final_score !== undefined ? (idea.final_score * 100).toFixed(1) : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                </div>
+              ) : (
+                <div className="p-4 border border-dashed border-slate-800 rounded-lg text-center text-slate-500 text-xs">
+                  No ideas yet. Run discovery to create ideas from this strategy's sources.
                 </div>
               )}
             </section>

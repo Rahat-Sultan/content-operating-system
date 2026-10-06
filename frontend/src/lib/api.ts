@@ -5,6 +5,8 @@ export interface IdeaItem {
   strategy_id: string;
   /** Target platforms of the idea's strategy, lower case. */
   platforms?: string[];
+  /** Name of the strategy this idea was discovered for. */
+  strategy_name?: string | null;
   title: string;
   description?: string | null;
   status: "NEW" | "SELECTED" | "IN_PROGRESS" | "PUBLISHED" | "REJECTED" | "EXPIRED";
@@ -96,10 +98,11 @@ export interface ApprovalDecisionResponse {
   feedback?: string | null;
 }
 
-export async function fetchIdeas(status?: string): Promise<IdeaItem[]> {
-  const url = status && status !== "ALL" 
-    ? `${API_BASE}/ideas?status=${encodeURIComponent(status)}`
-    : `${API_BASE}/ideas`;
+export async function fetchIdeas(status?: string, strategyId?: string): Promise<IdeaItem[]> {
+  const params = new URLSearchParams();
+  if (status && status !== "ALL") params.set("status", status);
+  if (strategyId) params.set("strategy_id", strategyId);
+  const url = params.toString() ? `${API_BASE}/ideas?${params.toString()}` : `${API_BASE}/ideas`;
   
   const res = await fetch(url);
   if (!res.ok) {

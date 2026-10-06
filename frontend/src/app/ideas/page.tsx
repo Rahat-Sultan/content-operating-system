@@ -243,6 +243,14 @@ export default function IdeasPage() {
                             year: "numeric",
                           })}
                         </span>
+                        {idea.strategy_name && (
+                          <span
+                            data-testid="idea-strategy"
+                            className="px-2 py-0.5 rounded border border-indigo-800 bg-indigo-950/50 text-[11px] font-medium text-indigo-300"
+                          >
+                            Strategy: {idea.strategy_name}
+                          </span>
+                        )}
                         {(idea.platforms ?? []).map((p) => (
                           <PlatformBadge key={p} platform={p} />
                         ))}
