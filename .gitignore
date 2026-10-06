@@ -49,3 +49,10 @@ content-os-instruction-part3*.md
 prompt-instruction/
 backend/tests/draft_comparison_results.json
 *.png
+
+# Local tooling and database dumps
+.claude/
+*.dump
+
+# Documentation screenshots are part of the docs
+!docs/images/*.png

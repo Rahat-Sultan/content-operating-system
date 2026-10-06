@@ -16,7 +16,8 @@ Companion documents: [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) (how t
 | Production workflow (research, writer, approval, revision, reject) | Working. Runs are durable: they survive a backend restart. Needs the worker running. |
 | Publishing to LinkedIn through Buffer | Working for text. Images attach only when a public HTTPS image URL is configured. |
 | Analytics (Buffer polling, snapshots, status, dashboard) | Working. LinkedIn only. Polling daily for 30 days after the backoff ladder. |
-| Frontend (Ideas board, Strategies, Sources, Analytics, Run page) | Working. One shared theme. Archive, restore, delete and human edits in place. |
+| Frontend (Ideas board, Strategies, Sources, Analytics, Run page, Settings) | Working. One shared theme. Login screen gates the whole app. |
+| Accounts and login | Email and password working. Google needs your OAuth credentials. Supabase not configured. Per-account data and keys. |
 | Image generation | Local test provider only (labelled as a stub). Real image models need OpenRouter credit. |
 | Other platforms (Facebook, Instagram, Reddit, Substack) | Listed, not connected. No publishing or analytics. |
 

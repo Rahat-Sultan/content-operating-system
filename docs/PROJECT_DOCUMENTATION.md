@@ -31,7 +31,7 @@ Strategy ─▶ Sources (RSS) ─▶ Scout + score (LLM) ─▶ Ideas ─▶ [yo
 | Sources | `/sources` | Add RSS sources. |
 | Run page | `/workflow-runs/{id}` | Review the draft, edit it, approve or request a revision, see media, analytics, publication. |
 | Analytics | `/analytics` | Per-platform tabs and a Show all view; impressions chart and table. |
-| Settings | `/settings` | Turn platforms on or off, set each Buffer channel ID, test the connection (read-only). |
+| Settings | `/settings` | Your own API keys (encrypted) and platforms: turn on or off, set the Buffer channel ID, test the connection (read-only). |
 
 ![Ideas board](images/ideas-board.png)
 ![Run page](images/run-page.png)
@@ -216,3 +216,22 @@ Test modules: 19 files under `backend/tests/`. Browser suites under `frontend/te
 - No silent fallbacks: a missing provider or missing configuration fails loudly and says so.
 - LLM output is data; code decides what is saved, scored and published.
 - Commits: `type(scope): summary`, with the attribution line.
+
+---
+
+## 12. Accounts, login and data ownership
+
+Every person who uses an installation has an account. Each account sees only its own data.
+
+- **Sign-in options** on the login screen: email and password (always available), Google (when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set in `backend/.env`), and Supabase (planned, not configured).
+- **Sessions:** the browser cookie has no expiry, so it ends when the browser session ends. The server also expires sessions after 8 hours. Logout ends a session at once.
+- **Lockout:** five wrong passwords lock the account for 15 minutes.
+- **Ownership:** strategies, sources, ideas, workflow runs, publications and scheduled jobs carry an owner. Drafts, versions, media and analytics belong to their workflow run. Every route checks ownership and answers 404 for another account's data.
+- **Keys and platforms are per account:** each account stores its own Buffer and OpenRouter keys (Settings, encrypted). When an account has no key of its own, the installation default in `.env` is used.
+- **Public media:** published images are served without login, because Buffer must fetch them.
+
+Set the password for an account from a terminal, so it never appears on a command line:
+
+```bash
+cd backend && ../.venv/bin/python -m app.accounts.set_password you@example.com
+```
