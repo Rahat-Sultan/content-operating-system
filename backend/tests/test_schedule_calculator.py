@@ -114,6 +114,18 @@ class TestScheduleCalculations(unittest.TestCase):
         )
         self.assertIsNone(get_next_analytics_sync_time(pub_no_ext, 0))
 
+    def test_analytics_sync_skips_non_buffer_ids(self):
+        # Local-test and invalid ids are never sent to Buffer.
+        for ext in ("linkedin_abc123", "test-ext-1", "stub_9", "buffer_idea_6abf35338a74c61099923dab"):
+            pub = Publication(
+                id=uuid4(),
+                status=PublicationStatus.PUBLISHED,
+                external_id=ext,
+                published_at=datetime.now(timezone.utc) - timedelta(days=1),
+            )
+            with self.subTest(ext=ext):
+                self.assertIsNone(get_next_analytics_sync_time(pub, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

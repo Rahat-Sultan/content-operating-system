@@ -75,7 +75,8 @@ def get_next_analytics_sync_time(
 
     # Never touches publications that are stubs or test mocks (per CP-2B: "Never touches publications that are stubs or have no external ID")
     ext_id = publication.external_id.strip()
-    if ext_id.startswith("linkedin_") or ext_id.startswith("test-ext-") or ext_id.startswith("stub_"):
+    # buffer_idea_* is not a Buffer post id (Buffer answers "Invalid PostId format").
+    if ext_id.startswith(("linkedin_", "test-ext-", "stub_", "buffer_idea_")):
         return None
 
     if sync_attempt_count >= len(ANALYTICS_BACKOFF_MINUTES):

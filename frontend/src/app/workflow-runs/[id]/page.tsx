@@ -188,6 +188,8 @@ export default function WorkflowRunDetailPage({
       setManualError(null);
       setShowManualMetricsForm(false);
       refetchAnalytics();
+      // analytics_status lives on the publication response, so refetch it too.
+      refetchPublication();
     },
     onError: (err: any) => {
       setManualError(err?.message || "Failed to submit manual metrics.");
