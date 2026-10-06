@@ -155,7 +155,23 @@ class JobScheduler:
             if active_job:
                 continue
 
-            next_due = get_next_analytics_sync_time(pub, sync_attempts)
+            last_job = (
+                db.query(ScheduledJob)
+                .filter(
+                    ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
+                    ScheduledJob.publication_id == pub.id,
+                    ScheduledJob.status == JobStatus.COMPLETED,
+                )
+                .order_by(ScheduledJob.completed_at.desc())
+                .first()
+            )
+            last_attempt_time = last_job.completed_at if last_job else None
+
+            next_due = get_next_analytics_sync_time(
+                pub,
+                sync_attempts,
+                last_attempt_time=last_attempt_time,
+            )
             if not next_due:
                 continue
 
@@ -338,6 +354,17 @@ def get_strategy_discovery_schedule_info(db: Session, strategy: ContentStrategy)
 
 def get_publication_sync_schedule_info(db: Session, publication: Publication) -> dict[str, Any]:
     """Returns analytics sync history and next scheduled sync details for a publication."""
+    # Check for active scheduled job
+    active_job = (
+        db.query(ScheduledJob)
+        .filter(
+            ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
+            ScheduledJob.publication_id == publication.id,
+            ScheduledJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+        )
+        .first()
+    )
+
     last_job = (
         db.query(ScheduledJob)
         .filter(
@@ -357,11 +384,21 @@ def get_publication_sync_schedule_info(db: Session, publication: Publication) ->
         )
         .count()
     )
-    next_sync = get_next_analytics_sync_time(publication, completed_or_failed_count)
+
+    last_attempt_time = last_job.completed_at if last_job else None
+    if active_job:
+        next_sync = active_job.scheduled_at
+    else:
+        next_sync = get_next_analytics_sync_time(
+            publication,
+            completed_or_failed_count,
+            last_attempt_time=last_attempt_time,
+        )
 
     return {
         "last_synced_at": last_job.completed_at.isoformat() if (last_job and last_job.completed_at) else None,
         "next_sync_at": next_sync.isoformat() if next_sync else None,
         "sync_attempt_count": completed_or_failed_count,
     }
+
 

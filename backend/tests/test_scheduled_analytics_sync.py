@@ -200,5 +200,71 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
         self.assertEqual(crashed_job.status, JobStatus.PENDING)
         self.assertIsNone(crashed_job.claimed_by)
 
+    def test_cp_1_6_schedule_bookkeeping(self):
+        """
+        CP-1.6 tests:
+        1. A publication with five prior attempts shows attempt 5/6 and a future next time.
+        2. After the last attempt (6) it shows "No more scheduled syncs" (next_sync_at is None).
+        3. An unsupported publication (or stub external_id) shows no schedule.
+        """
+        from app.scheduler.service import get_publication_sync_schedule_info
+
+        now = datetime.now(timezone.utc)
+        # Create 5 completed jobs for self.pub
+        for i in range(5):
+            j = ScheduledJob(
+                id=uuid4(),
+                job_type=JobType.ANALYTICS_SYNC,
+                status=JobStatus.COMPLETED,
+                publication_id=self.pub.id,
+                scheduled_at=now - timedelta(minutes=60 - i * 10),
+                completed_at=now - timedelta(minutes=50 - i * 10),
+                payload={"attempt": i + 1},
+            )
+            self.db.add(j)
+        self.db.commit()
+
+        info = get_publication_sync_schedule_info(self.db, self.pub)
+        self.assertEqual(info["sync_attempt_count"], 5)
+        self.assertIsNotNone(info["next_sync_at"])
+        # Attempt 5 next time should be in the future (relative to last attempt + 10080 min)
+        next_dt = datetime.fromisoformat(info["next_sync_at"])
+        self.assertGreater(next_dt, now)
+
+        # Now add 6th completed job (total 6 attempts, which is max len(ANALYTICS_BACKOFF_MINUTES))
+        j6 = ScheduledJob(
+            id=uuid4(),
+            job_type=JobType.ANALYTICS_SYNC,
+            status=JobStatus.COMPLETED,
+            publication_id=self.pub.id,
+            scheduled_at=now - timedelta(minutes=5),
+            completed_at=now - timedelta(minutes=4),
+            payload={"attempt": 6},
+        )
+        self.db.add(j6)
+        self.db.commit()
+
+        info_max = get_publication_sync_schedule_info(self.db, self.pub)
+        self.assertEqual(info_max["sync_attempt_count"], 6)
+        self.assertIsNone(info_max["next_sync_at"])  # "No more scheduled syncs"
+
+        # Unsupported publication (e.g. stub_ or linkedin_ mock external_id)
+        mock_pub = Publication(
+            id=uuid4(),
+            content_version_id=self.version.id,
+            platform="linkedin",
+            status=PublicationStatus.PUBLISHED,
+            idempotency_key=f"test-unsupported-{uuid4()}",
+            external_id="linkedin_unsupported_stub",
+            published_at=now,
+        )
+        self.db.add(mock_pub)
+        self.db.commit()
+
+        info_unsupported = get_publication_sync_schedule_info(self.db, mock_pub)
+        self.assertIsNone(info_unsupported["next_sync_at"])
+
+
 if __name__ == "__main__":
     unittest.main()
+

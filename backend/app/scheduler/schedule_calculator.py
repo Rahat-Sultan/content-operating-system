@@ -59,12 +59,16 @@ def is_strategy_discovery_due(
 def get_next_analytics_sync_time(
     publication: Publication,
     sync_attempt_count: int,
+    last_attempt_time: datetime | None = None,
 ) -> datetime | None:
     """
     Computes the scheduled time for the next analytics sync attempt:
     - Skips publications that are not PUBLISHED or have no external_id.
     - If publication has an initial/stub indicator without real ID, skip.
     - After len(ANALYTICS_BACKOFF_MINUTES) attempts, stops (returns None).
+    - If last_attempt_time is provided and attempts > 0, next time is computed
+      from the last attempt using the step's interval, or from published_at
+      if last_attempt_time is not set.
     """
     if publication.status.value != "PUBLISHED" or not publication.external_id:
         return None
@@ -78,9 +82,14 @@ def get_next_analytics_sync_time(
         return None
 
     delay_minutes = ANALYTICS_BACKOFF_MINUTES[sync_attempt_count]
-    base_time = publication.published_at or publication.created_at
+
+    if last_attempt_time is not None and sync_attempt_count > 0:
+        base_time = last_attempt_time
+    else:
+        base_time = publication.published_at or publication.created_at
+
     if base_time.tzinfo is None:
         base_time = base_time.replace(tzinfo=timezone.utc)
 
-    # Next attempt is scheduled at published_at + delay_minutes
     return base_time + timedelta(minutes=delay_minutes)
+
