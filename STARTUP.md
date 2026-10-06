@@ -134,14 +134,28 @@ Open `http://localhost:3000` in the browser. Always port 3000.
 ## 7. Scheduler Startup & Testing (Background Worker)
 
 The background worker automatically polls PostgreSQL for due scheduled discoveries and analytics sync jobs.
+Each loop it writes a heartbeat row to `worker_heartbeats`; the publication page reads it to show whether automatic sync is running.
 
 ### Scheduler Startup
-Open a dedicated terminal:
+Start the backend and the scheduler from **your own terminal**, not from an agent sandbox. A sandbox without DNS makes every Buffer call fail. Run the migration once after pulling:
 ```bash
 cd ~/BxTrackSolution/content-os/backend
 source ../.venv/bin/activate
+alembic upgrade head        # adds worker_heartbeats (revision a4c7e2b91f30)
 python -m app.scheduler
 ```
+
+### Re-running the Buffer diagnostic
+Read-only. Sends only `post(input: {id})` queries for real published posts, prints a table, never writes to the database, never prints the token:
+```bash
+cd ~/BxTrackSolution/content-os/backend
+../.venv/bin/python -m app.analytics.diagnose                    # table
+../.venv/bin/python -m app.analytics.diagnose --save-raw DIR     # also write redacted raw JSON per post
+```
+Local-test publications (`linkedin_*`, `test-ext-*`, `stub_*`) are skipped: they are not Buffer posts.
+
+### Network check
+With the backend running: `curl http://localhost:8000/health/network`. All three hosts should show `resolved: true`.
 
 Environment variables:
 - `SCHEDULER_POLL_INTERVAL`: Polling interval in seconds (default `2.0`).

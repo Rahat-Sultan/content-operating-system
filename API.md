@@ -107,12 +107,21 @@ GET /api/workflow-runs/{id}/publication
 GET /api/workflow-runs/{id}/draft
 ```
 
-- `POST /api/publications/{id}/analytics/sync`: Manually triggers metrics sync against the analytics provider (e.g. Buffer). Returns HTTP 201 on success with new snapshot, HTTP 409 if metrics are not yet available (provider collection delay), or HTTP 404 if the post is not found.
+- `POST /api/publications/{id}/analytics/sync`: Manually triggers metrics sync against the analytics provider (e.g. Buffer). Returns HTTP 201 on success with new snapshot, HTTP 409 if Buffer answered but has no metrics for the post yet (`not_ready`), HTTP 503 with `detail.state = "network_error"` if this server could not reach Buffer (DNS, timeout or connection failure; nothing is checked and no snapshot is written), or HTTP 404 if the post is not found. Every click's outcome is recorded on the publication and shown as "Last attempt".
+- `GET /health/network`: Diagnostic run inside the backend process. For `api.buffer.com`, `openrouter.ai` and `github.com` it returns `{host, resolved, ip_count, http_status, error, ms}` per host plus `all_resolved`. Sends no credentials and never returns response bodies. Use it to tell "this server cannot resolve Buffer" apart from "Buffer has no metrics".
 - `POST /api/publications/{id}/analytics/manual`: Submits verified metrics observed directly on LinkedIn (impressions, reactions, comments, clicks, shares). Stores an `analytics` record with `provider='manual'`, used as headline metrics if most recent.
-- `GET /api/workflow-runs/{id}/publication`: Returns the publication record with `schedule_info`:
-  - `last_synced_at`: ISO timestamp of most recent successful sync.
-  - `next_sync_at`: ISO timestamp of next scheduled sync attempt in backoff ladder.
-  - `sync_attempt_count`: Total sync attempts executed so far.
+- `GET /api/workflow-runs/{id}/publication`: Returns the publication record with `analytics_status` and `schedule_info`.
+  - `analytics_status.state`: one of `available` (a valid Buffer snapshot exists), `manual` (latest valid snapshot was entered by hand), `not_collected_yet` (Buffer answered with no metrics), `network_error` (this server could not reach Buffer), `failed` (the last attempt failed with a provider error), `none` (no attempt and no valid snapshot). Exactly one state is shown; it comes from the most recent attempt, scheduled or manual.
+  - `analytics_status.last_attempt_at`, `last_attempt_outcome`, `last_attempt_source` (`scheduler` or `manual`), `last_attempt_message`: the most recent attempt.
+  - `analytics_status.last_buffer_response_at`: last time Buffer answered (`ready` or `not_ready`). Network failures never count.
+  - `analytics_status.attempt_number`: rung on the metrics ladder (1 to 6). Network failures do not advance it.
+  - `analytics_status.network_failures_in_row`, `network_retry_paused`: automatic retries after network failures wait 5 minutes and pause after 12 in a row. A successful sync resets the count.
+  - `analytics_status.scheduler_running`: true when a worker heartbeat is fresher than 2 minutes. When false the UI says "Automatic sync is OFF. Start the worker: `python -m app.scheduler`."
+  - `analytics_status.next_sync_at`, `next_sync_overdue`: a past scheduled time is flagged overdue, never shown as upcoming.
+  - `analytics_status.valid_snapshot`: the newest snapshot that is not a stub and not quarantined.
+  - `schedule_info.last_synced_at`: ISO timestamp of most recent successful sync.
+  - `schedule_info.next_sync_at`: ISO timestamp of next scheduled sync attempt in backoff ladder.
+  - `schedule_info.sync_attempt_count`: Attempts on the metrics ladder so far (network failures excluded).
 - `GET /api/workflow-runs/{id}/draft`: Returns draft versions and summary, including `linkedin_preview` (clean plain-text rendered string for LinkedIn), `char_count`, and `will_truncate` boolean flag.
 - `GET /api/strategies/{id}`: Returns strategy with `schedule_info`:
   - `interval_hours`: Configured discovery interval in hours.

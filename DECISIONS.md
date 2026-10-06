@@ -226,6 +226,14 @@ Reason:
 
 Buffer returns initial placeholder records immediately after publication where comments, reactions, and impressions are empty or zero, and `metricsUpdatedAt` reflects the publication dispatch timestamp. Treating uncollected placeholders as genuine performance data corrupted reporting by recording zero performance for posts that had real impressions on LinkedIn.
 
+Measured behavior (2026-10-06, 7 real published posts, `python -m app.analytics.diagnose`):
+
+- The earlier timestamp gate is wrong. Every response has `metricsUpdatedAt > sentAt`, including placeholders. Buffer's docs define `metricsUpdatedAt` as "the most recent ingestion, not the most recent network change", so it is not evidence of collected data.
+- The shape is the signal. A placeholder reports only `Reactions` and `Comments` (both zero). A collected post also reports `Impressions`, `Reach` and `Eng. Rate`. Example: post `6ac3541…` (sent 5 Oct 07:39 UTC) reports Impressions 95, Reach 51, Reactions 2, Eng. Rate 2.11%.
+- The gate is now: store only when the response reports a metric other than Reactions/Comments. A genuine zero with Impressions present is stored. Fixtures: `backend/tests/fixtures/buffer_post_collected_6ac3541.json`, `buffer_post_placeholder_6abf5652.json`.
+- Buffer's developer docs say newly sent posts "can take up to ~24 hours before metrics first appear" with a daily refresh (https://developers.buffer.com/guides/post-metrics.md). Measured for `6ac3541…`: placeholder at about 12:28 UTC on 5 Oct (4.8 h after send), collected by 04:32 UTC on 6 Oct (21.0 h after send).
+- Not explained: five older posts (sent 2 to 5 Oct, 24 h to 94 h old) still report only Reactions and Comments at zero, with one shared ingestion time. The docs say a missing metric "does not mean zero" and only lists metrics the network reported. Whether this is a delay beyond the documented window, a per-channel permission, or LinkedIn not reporting impressions for those posts is UNKNOWN. The channel is connected and carries `r_member_postAnalytics` and `r_member_profileAnalytics`. Settling question: does Buffer's own dashboard show impressions for those posts?
+
 ---
 
 ## ADR-019 — LinkedIn Plain-Text Rendering and Draft Immutability
@@ -237,3 +245,16 @@ LinkedIn posts are converted from Markdown to clean plain text via `render_for_l
 Reason:
 
 LinkedIn does not parse Markdown; raw `#` headers, `**bold**`, and `[link](url)` markup degrade post quality. The human reviewer verifies the Markdown draft and sees a 1:1 plain-text LinkedIn preview with character limit checks before approving. Preserving Markdown in `content_versions` maintains editorial formatting for potential multi-platform expansion.
+
+---
+
+## ADR-021 — Network Failures Are Their Own State
+
+Decision:
+
+A failure to reach the analytics provider (DNS, refused or reset connection, timeout) is reported as `network_error` ("Couldn't reach Buffer from this server"). It is never reported as "metrics not yet available", never stores a snapshot, and never consumes a rung of the metrics retry ladder. Retries run after 5 minutes and pause after 12 in a row.
+
+Reason:
+
+On 6 Oct 2026 the page showed a DNS failure and, at the same time, "Metrics Not Yet Available ... Attempt 1 of 6". The DNS failure had consumed the attempt. The two conditions need different fixes: a network fix versus waiting on Buffer.
+
