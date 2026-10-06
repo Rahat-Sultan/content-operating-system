@@ -110,6 +110,12 @@ class PublishingService:
                 f"but latest version is v{latest_version.version_number} ({latest_version.id}). Stale versions cannot publish."
             )
 
+        # Resolve the public image URL before any write, so a configuration error fails cleanly.
+        from app.media.public_url import public_image_url_for_version
+        image_url = public_image_url_for_version(db, version.id)
+        if image_url:
+            request_metadata = {**(request_metadata or {}), "image_url": image_url}
+
         # -------------------------------------------------------------
         # STEP 2: Durable Publication State & Idempotency Key
         # -------------------------------------------------------------

@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     publisher_provider: str = "local"
     buffer_access_token: str = ""
     buffer_profile_id: str = ""
+    # Public HTTPS base URL where media files are reachable. Buffer fetches images from
+    # this URL itself, so localhost will never work. Example: https://media.example.com
+    media_public_base_url: str = ""
 
 
 settings = Settings()

@@ -185,6 +185,7 @@ class BufferPublisher(PublisherInterface):
             )
 
         from app.publishing.render import render_for_linkedin
+        from app.media.public_url import buffer_assets_for
 
         was_truncated = False
         if request.platform.lower().strip() == "linkedin":
@@ -243,7 +244,7 @@ class BufferPublisher(PublisherInterface):
                     "mode": "shareNow",
                     "schedulingType": "automatic",
                     "needsApproval": False,
-                    "assets": [],
+                    "assets": buffer_assets_for(request.metadata.get("image_url")),
                 }
             }
             resp_data = self._execute_graphql(client, create_post_mutation, variables)
