@@ -212,6 +212,11 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
         from app.scheduler.service import get_publication_sync_schedule_info
 
         now = datetime.now(timezone.utc)
+        # The polling window is 30 days after publication. This setup publishes 30 days ago,
+        # so the window has already closed and no next sync is correct. Publish 1 day ago
+        # to test the ladder itself.
+        self.pub.published_at = now - timedelta(days=1)
+        self.db.commit()
         # Create 5 completed jobs for self.pub
         for i in range(5):
             j = ScheduledJob(
@@ -248,7 +253,9 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
 
         info_max = get_publication_sync_schedule_info(self.db, self.pub)
         self.assertEqual(info_max["sync_attempt_count"], 6)
-        self.assertIsNone(info_max["next_sync_at"])  # "No more scheduled syncs"
+        # After the ladder: one check a day for 30 days after publication (not "no more syncs").
+        expected = datetime.fromisoformat(info_max["last_synced_at"]) + timedelta(hours=24)
+        self.assertEqual(datetime.fromisoformat(info_max["next_sync_at"]), expected)
 
         # Unsupported publication (e.g. stub_ or linkedin_ mock external_id)
         mock_pub = Publication(
