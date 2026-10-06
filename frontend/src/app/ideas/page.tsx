@@ -53,6 +53,12 @@ export default function IdeasPage() {
         </div>
         <nav className="flex items-center space-x-6">
           <Link
+            href="/analytics"
+            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            Analytics
+          </Link>
+          <Link
             href="/sources"
             className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
           >

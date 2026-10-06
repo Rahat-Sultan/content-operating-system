@@ -573,3 +573,37 @@ export async function generateVersionMedia(
   }
   return data;
 }
+
+export interface AnalyticsSummaryPost {
+  publication_id: string;
+  workflow_run_id: string | null;
+  platform: string;
+  external_id: string | null;
+  published_at: string | null;
+  has_snapshot: boolean;
+  collected_at: string | null;
+  provider: string | null;
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  clicks: number | null;
+  shares: number | null;
+  snapshot_count: number;
+  is_test_post: boolean;
+}
+
+export interface AnalyticsSummary {
+  post_count: number;
+  posts_with_metrics: number;
+  total_impressions: number;
+  total_reactions: number;
+  total_comments: number;
+  include_test: boolean;
+  posts: AnalyticsSummaryPost[];
+}
+
+export async function fetchAnalyticsSummary(includeTest = false): Promise<AnalyticsSummary> {
+  const res = await fetch(`${API_BASE}/analytics/summary?include_test=${includeTest}`);
+  if (!res.ok) throw new Error(`Failed to load analytics summary: ${res.statusText}`);
+  return res.json();
+}
