@@ -45,12 +45,13 @@ def _normalize_words(text: str) -> list[str]:
 def lint_draft(
     draft_body: str,
     voice_sample: str | None = None,
+    platform: str = "linkedin",
 ) -> list[dict[str, Any]]:
     """
     Deterministic draft linting function.
     Returns a list of warning dicts:
     [
-        {"category": "leakage" | "ai_tell" | "unsupported_experience", "message": "..."}
+        {"category": "leakage" | "ai_tell" | "unsupported_experience" | "markdown_syntax", "message": "..."}
     ]
     """
     warnings: list[dict[str, Any]] = []
@@ -59,6 +60,7 @@ def lint_draft(
 
     draft_lower = draft_body.lower()
     draft_words = _normalize_words(draft_body)
+
 
     # 1. Voice-sample leakage: 6 or more consecutive words
     if voice_sample and voice_sample.strip():
@@ -99,4 +101,27 @@ def lint_draft(
                 "message": f"Potential unsupported experience claim flagged: '{match.group(0)}'",
             })
 
+    # 4. Markdown syntax detection (CP-3.4: drafts for LinkedIn should be clean plain text)
+    if platform.lower() == "linkedin":
+        # Check for markdown headings (#, ##, ###)
+        if re.search(r"^\s*#{1,6}\s+", draft_body, flags=re.MULTILINE):
+            warnings.append({
+                "category": "markdown_syntax",
+                "message": "Markdown headings (# / ##) detected. LinkedIn drafts should use plain text line breaks.",
+            })
+        # Check for bold / italic markers (**bold** or *italic*)
+        if re.search(r"\*\*[^*]+\*\*|(?<!\w)_[^_]+_(?!\w)", draft_body):
+            warnings.append({
+                "category": "markdown_syntax",
+                "message": "Markdown bold/italic syntax (** / _) detected. LinkedIn does not render markdown formatting.",
+            })
+        # Check for markdown links [text](url)
+        if re.search(r"\[([^\]]+)\]\(([^)]+)\)", draft_body):
+            warnings.append({
+                "category": "markdown_syntax",
+                "message": "Markdown link syntax [text](url) detected. Use plain text format: 'text (url)'.",
+            })
+
     return warnings
+
+

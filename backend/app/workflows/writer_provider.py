@@ -28,12 +28,15 @@ Your writing standards:
      * DO NOT use generic engagement bait / CTAs: "What are your thoughts? Let me know in the comments!", "How does your team handle this? Share below!".
      * DO NOT write in uniform, predictable bullet lists with bold headers unless describing genuine technical lists (like configuration keys or discrete failure modes). Vary paragraph rhythms and sentence lengths.
      * Avoid marketing hyperbole: "revolutionary", "game-changing", "seamlessly", "paradigm shift", "leverage", "unlock the power".
-3. Structure:
-   - Strong, direct title.
+3. Structure & Format (LinkedIn Target):
+   - Strong, direct single hook line at the very top (first line).
+   - DO NOT repeat or duplicate the title inside the body.
+   - OUTPUT PLAIN TEXT ONLY: No markdown headings (#, ##, ###), no bold (**text**), no italic (*text* or _text_), no code fences (```). LinkedIn does NOT render markdown.
+   - Use short, readable paragraphs separated by blank lines.
    - Immediate immersion in the engineering reality, bottleneck, or architecture without preamble.
-   - Technical substance: mechanics, specific constraints, production tradeoffs, and pragmatic code/architectural realities.
-   - Clean ending highlighting the key takeaway or production caveat.
-4. Output Markdown: Format your draft in clean, standard GitHub-flavored Markdown. Do not wrap the entire output in triple backticks."""
+   - Technical substance: mechanics, specific constraints, production tradeoffs, and pragmatic architectural realities.
+   - Clean ending highlighting the key takeaway or production caveat. No generic CTAs or summary cliches.
+4. Output: Format your draft as clean, plain text paragraphs suitable for LinkedIn. Do not wrap the output in triple backticks."""
 
 
 def build_writer_prompt(
@@ -81,6 +84,7 @@ Do NOT just re-run the previous text unchanged — adapt the tone, structure, or
     return f"""Target Strategy: {strategy.name if strategy else "Engineering"}
 Strategy Voice & Tone: {strategy_config.get("tone", "Direct, authoritative, technically rigorous")}
 Target Audience: {brief_data.get("target_audience", "Senior Software Engineers")}
+Target Platform: LinkedIn
 {voice_sample_section}
 Idea Title: {idea.title}
 Editorial Angle: {brief_data.get("angle", idea.title)}
@@ -95,7 +99,12 @@ Grounded Research Findings:
 - Key Findings: {json.dumps(key_findings)}
 - Verified Claims: {json.dumps(claims)}
 {revision_instructions}
-Draft the complete, publication-ready technical article (minimum 400-600 words) adhering strictly to these requirements and style standards."""
+Draft the complete, publication-ready LinkedIn post (approx 350-500 words).
+CRITICAL FORMAT RULES:
+- Output clean plain text paragraphs separated by blank lines.
+- Do NOT include markdown headings (# or ##), do NOT use bold (** or __), italic, or backticks.
+- Do NOT repeat the title as the first line of the body. Start directly with the hook line.
+- Strictly adhere to these requirements, honesty rules, and style standards."""
 
 
 def execute_writer_generation(

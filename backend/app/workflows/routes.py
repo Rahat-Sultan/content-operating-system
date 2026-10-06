@@ -171,6 +171,7 @@ def read_content_draft(
     db: Session = Depends(get_db),
 ):
     from app.strategies.models import ContentStrategy
+    from app.workflows.models import WorkflowRun
     from app.workflows.draft_lint import lint_draft
 
     content, versions = get_draft_for_workflow_run(db, id)
@@ -181,8 +182,29 @@ def read_content_draft(
         if strat and strat.config:
             voice_sample = strat.config.get("voice_sample")
 
+    from app.publishing.render import render_for_linkedin
+
     current_ver = versions[0]
     current_lint = lint_draft(current_ver.body, voice_sample=voice_sample)
+    current_preview, current_trunc = render_for_linkedin(current_ver.title, current_ver.body)
+
+    version_summaries = []
+    for v in versions:
+        v_preview, v_trunc = render_for_linkedin(v.title, v.body)
+        version_summaries.append(
+            ContentVersionSummary(
+                id=v.id,
+                version_number=v.version_number,
+                origin=v.origin.value,
+                title=v.title,
+                body=v.body,
+                lint_warnings=lint_draft(v.body, voice_sample=voice_sample),
+                created_at=v.created_at,
+                linkedin_preview=v_preview,
+                char_count=len(v_preview),
+                will_truncate=v_trunc,
+            )
+        )
 
     return ContentDraftResponse(
         content_id=content.id,
@@ -195,20 +217,15 @@ def read_content_draft(
             body=current_ver.body,
             lint_warnings=current_lint,
             created_at=current_ver.created_at,
+            linkedin_preview=current_preview,
+            char_count=len(current_preview),
+            will_truncate=current_trunc,
         ),
-        versions=[
-            ContentVersionSummary(
-                id=v.id,
-                version_number=v.version_number,
-                origin=v.origin.value,
-                title=v.title,
-                body=v.body,
-                lint_warnings=lint_draft(v.body, voice_sample=voice_sample),
-                created_at=v.created_at,
-            )
-            for v in versions
-        ],
+        versions=version_summaries,
         lint_warnings=current_lint,
+        linkedin_preview=current_preview,
+        char_count=len(current_preview),
+        will_truncate=current_trunc,
     )
 
 

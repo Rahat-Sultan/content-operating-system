@@ -69,6 +69,9 @@ class ContentVersionSummary(BaseModel):
     body: str
     lint_warnings: list[dict[str, Any]] = []
     created_at: datetime
+    linkedin_preview: str | None = None
+    char_count: int | None = None
+    will_truncate: bool = False
 
 
 class ContentDraftResponse(BaseModel):
@@ -79,3 +82,6 @@ class ContentDraftResponse(BaseModel):
     current_version: ContentVersionSummary
     versions: list[ContentVersionSummary]
     lint_warnings: list[dict[str, Any]] = []
+    linkedin_preview: str | None = None
+    char_count: int | None = None
+    will_truncate: bool = False
