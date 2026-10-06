@@ -107,6 +107,8 @@ GET /api/workflow-runs/{id}/publication
 GET /api/workflow-runs/{id}/draft
 ```
 
+- `POST /api/workflow-runs` returns `status: PENDING` (queued). The scheduler worker starts the graph; `GET /api/workflow-runs/{id}` includes `worker_running` so the UI can say when nothing will start the run.
+- `POST /api/workflow-runs/{id}/approval` queues the resume in the same transaction as the decision. The worker runs it.
 - `POST /api/publications/{id}/analytics/sync`: Manually triggers metrics sync against the analytics provider (e.g. Buffer). Returns HTTP 201 on success with new snapshot, HTTP 409 if Buffer answered but has no metrics for the post yet (`not_ready`), HTTP 503 with `detail.state = "network_error"` if this server could not reach Buffer (DNS, timeout or connection failure; nothing is checked and no snapshot is written), or HTTP 404 if the post is not found. Every click's outcome is recorded on the publication and shown as "Last attempt".
 - `GET /health/network`: Diagnostic run inside the backend process. For `api.buffer.com`, `openrouter.ai` and `github.com` it returns `{host, resolved, ip_count, http_status, error, ms}` per host plus `all_resolved`. Sends no credentials and never returns response bodies. Use it to tell "this server cannot resolve Buffer" apart from "Buffer has no metrics".
 - `POST /api/publications/{id}/analytics/manual`: Submits verified metrics observed directly on LinkedIn (impressions, reactions, comments, clicks, shares). Stores an `analytics` record with `provider='manual'`, used as headline metrics if most recent.

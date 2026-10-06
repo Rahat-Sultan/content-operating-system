@@ -426,6 +426,17 @@ export default function WorkflowRunDetailPage({
           </div>
         )}
 
+        {/* Queued but nothing will start it until the scheduler worker runs */}
+        {run.status === "PENDING" && run.worker_running === false && (
+          <section data-testid="run-queued-no-worker" className="p-4 rounded-xl bg-amber-950/30 border border-amber-700/60 text-amber-200 text-xs space-y-1">
+            <p className="font-semibold">Queued. The workflow has not started yet.</p>
+            <p>
+              Nothing is running it: the scheduler worker is not running. Start it in your own terminal with{" "}
+              <code className="font-mono">python -m app.scheduler</code>.
+            </p>
+          </section>
+        )}
+
         {/* NEEDS_REVIEW Notice & Human Editorial Actions */}
         {run.status === "NEEDS_REVIEW" && (
           <section className="p-6 rounded-xl bg-amber-950/20 border border-amber-600/50 space-y-4 shadow-lg">

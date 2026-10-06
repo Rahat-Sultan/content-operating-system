@@ -145,6 +145,9 @@ alembic upgrade head        # adds worker_heartbeats (revision a4c7e2b91f30)
 python -m app.scheduler
 ```
 
+### Production workflows need the worker
+Starting a workflow (`POST /api/workflow-runs`) and approving it both queue a job; the worker runs the graph. Without `python -m app.scheduler` running, a new run stays **PENDING** and the run page says "Queued. Nothing is running it." Runs survive a backend restart because the queued job is in PostgreSQL.
+
 ### Re-running the Buffer diagnostic
 Read-only. Sends only `post(input: {id})` queries for real published posts, prints a table, never writes to the database, never prints the token:
 ```bash

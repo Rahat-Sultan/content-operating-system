@@ -258,3 +258,21 @@ Reason:
 
 On 6 Oct 2026 the page showed a DNS failure and, at the same time, "Metrics Not Yet Available ... Attempt 1 of 6". The DNS failure had consumed the attempt. The two conditions need different fixes: a network fix versus waiting on Buffer.
 
+---
+
+## ADR-022 — Production Workflow Runs Execute in the Durable Scheduler Worker
+
+Decision:
+
+Starting a WorkflowRun and resuming one after approval are rows in `scheduled_jobs` (`job_type = WORKFLOW_RUN`), written in the same transaction as the state change. The worker (`python -m app.scheduler`) claims them and runs the graph. FastAPI `BackgroundTasks` is no longer used for workflows.
+
+Reason:
+
+A backend restart used to lose any run in progress. The queued job is in PostgreSQL, so it survives. Start claims `PENDING -> RUNNING` with a conditional UPDATE, so a duplicate job cannot run a graph twice. Long jobs renew their claim and heartbeat every 30 s, so a run longer than the 5-minute stale-claim timeout is not run a second time.
+
+Trade-off:
+
+Nothing runs a workflow unless the worker is running. The UI reports this (`worker_running`). Resume jobs are at-least-once: if the worker dies mid-resume, the job is retried from the LangGraph checkpoint. Publishing remains idempotent by key, so a retry cannot double-post.
+
+Verified 2026-10-06 on a scratch copy of the database: start queued, worker started it to NEEDS_REVIEW, REJECTED approval queued, worker resumed it to REJECTED, zero publications created.
+

@@ -36,6 +36,8 @@ export interface WorkflowRunResponse {
   started_at: string;
   resolved_at?: string | null;
   error?: string | null;
+  /** False while a PENDING run waits for the scheduler worker to start it. */
+  worker_running?: boolean | null;
 }
 
 export interface ResearchResponse {
