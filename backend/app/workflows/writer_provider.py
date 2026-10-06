@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.workflows.post_format import plain_post_text, strip_title_heading
 from app.ideas.models import Idea
 from app.llm.openrouter_client import (
     execute_llm_completion,
@@ -32,6 +33,9 @@ Your writing standards:
    - Strong, direct single hook line at the very top (first line).
    - DO NOT repeat or duplicate the title inside the body.
    - OUTPUT PLAIN TEXT ONLY: No markdown headings (#, ##, ###), no bold (**text**), no italic (*text* or _text_), no code fences (```). LinkedIn does NOT render markdown.
+   - NO SECTION LABELS: do not use headings or labels such as "Introduction", "Architectural Deep Dive", "Implementation Guide", "Conclusion" or "Key Takeaways". Write continuous paragraphs that move from one point to the next.
+   - LISTS ARE RARE: at most one short list, and only when the content is a real sequence of steps or settings. Never a list of three generic points.
+   - SOUND LIKE ONE PERSON: plain sentences, some short, some long. Contractions are fine. Avoid stacked triplets ("X, Y, and Z" used as a rhythm), avoid "not only X but also Y", and avoid ending every paragraph on a moral.
    - Use short, readable paragraphs separated by blank lines.
    - Immediate immersion in the engineering reality, bottleneck, or architecture without preamble.
    - Technical substance: mechanics, specific constraints, production tradeoffs, and pragmatic architectural realities.
@@ -102,7 +106,7 @@ Grounded Research Findings:
 Draft the complete, publication-ready LinkedIn post (approx 350-500 words).
 CRITICAL FORMAT RULES:
 - Output clean plain text paragraphs separated by blank lines.
-- Do NOT include markdown headings (# or ##), do NOT use bold (** or __), italic, or backticks.
+- Do NOT include markdown headings (# or ##), section labels, bold (** or __), italic, or backticks. Write it as a post a person would type into LinkedIn.
 - Do NOT repeat the title as the first line of the body. Start directly with the hook line.
 - Strictly adhere to these requirements, honesty rules, and style standards."""
 
@@ -141,13 +145,12 @@ def execute_writer_generation(
         temperature=0.4,
     )
 
-    # Derive title from generated markdown if first line is '# Title'
-    lines = content.strip().split("\n")
-    first_line = lines[0].strip()
-    if first_line.startswith("# "):
-        draft_title = first_line[2:].strip()
+    # The title is the first heading if the model wrote one. It is not repeated in the body.
+    heading, body = strip_title_heading(content)
+    if heading:
+        draft_title = heading
     else:
         brief_data = brief.brief if brief else {}
         draft_title = brief_data.get("angle") or f"Architectural Overview: {idea.title}"
 
-    return draft_title, content.strip(), user_prompt, used_model, is_fallback
+    return draft_title, plain_post_text(body), user_prompt, used_model, is_fallback
