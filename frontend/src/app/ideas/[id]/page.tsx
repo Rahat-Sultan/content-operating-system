@@ -12,7 +12,7 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   IN_PROGRESS: "bg-amber-900/60 text-amber-300 border-amber-700/50",
   PUBLISHED: "bg-purple-900/60 text-purple-300 border-purple-700/50",
   REJECTED: "bg-rose-900/60 text-rose-300 border-rose-700/50",
-  EXPIRED: "bg-slate-800 text-slate-400 border-slate-700",
+  EXPIRED: "bg-raised text-muted border-line-strong",
 };
 
 interface ScoreMetricProps {
@@ -24,20 +24,20 @@ interface ScoreMetricProps {
 function ScoreMetric({ label, score, weight }: ScoreMetricProps) {
   const percentage = score != null ? Math.round(score * 100) : 0;
   return (
-    <div className="bg-slate-900/60 border border-slate-800/80 rounded-lg p-3.5 space-y-2">
+    <div className="bg-panel/60 border border-line/80 rounded-lg p-3.5 space-y-2">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-300 font-medium">{label}</span>
-        <span className="text-slate-500 font-mono text-[11px]">{weight}</span>
+        <span className="text-body font-medium">{label}</span>
+        <span className="text-subtle font-mono text-[11px]">{weight}</span>
       </div>
       <div className="flex items-end justify-between">
-        <span className="text-lg font-bold text-slate-100 font-mono">
+        <span className="text-lg font-bold text-strong font-mono">
           {score != null ? (score * 100).toFixed(0) : "N/A"}
-          <span className="text-xs text-slate-500 font-normal">/100</span>
+          <span className="text-xs text-subtle font-normal">/100</span>
         </span>
       </div>
-      <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+      <div className="w-full bg-raised h-1.5 rounded-full overflow-hidden">
         <div
-          className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+          className="bg-accent-hover h-full rounded-full transition-all duration-500"
           style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
         />
       </div>
@@ -121,10 +121,10 @@ export default function IdeaDetailPage({
 
   if (isIdeaLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-canvas text-strong flex items-center justify-center">
         <div className="flex flex-col items-center space-y-3">
-          <div className="h-7 w-7 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-          <p className="text-sm text-slate-400">Loading idea details...</p>
+          <div className="h-7 w-7 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <p className="text-sm text-muted">Loading idea details...</p>
         </div>
       </div>
     );
@@ -132,7 +132,7 @@ export default function IdeaDetailPage({
 
   if (isIdeaError || !idea) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-canvas text-strong p-8 max-w-4xl mx-auto">
         <div className="p-4 rounded-lg bg-rose-950/40 border border-rose-800 text-rose-300">
           <h2 className="font-semibold text-sm">Failed to load idea</h2>
           <p className="text-xs mt-1 text-rose-400">
@@ -140,7 +140,7 @@ export default function IdeaDetailPage({
           </p>
           <Link
             href="/ideas"
-            className="inline-block mt-4 text-xs font-semibold text-indigo-400 hover:underline"
+            className="inline-block mt-4 text-xs font-semibold text-accent-text hover:underline"
           >
             ← Back to Ideas
           </Link>
@@ -150,16 +150,16 @@ export default function IdeaDetailPage({
   }
 
   const badgeStyle =
-    STATUS_BADGE_STYLES[idea.status] || "bg-slate-800 text-slate-300 border-slate-700";
+    STATUS_BADGE_STYLES[idea.status] || "bg-raised text-body border-line-strong";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-16">
+    <div className="min-h-screen bg-canvas text-strong pb-16">
       {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
           <Link
             href="/ideas"
-            className="text-xs font-medium text-slate-400 hover:text-slate-200 transition"
+            className="text-xs font-medium text-muted hover:text-body-strong transition"
           >
             ← Back to Ideas
           </Link>
@@ -202,7 +202,7 @@ export default function IdeaDetailPage({
               {conflict.workflow_run_id && (
                 <Link
                   href={`/workflow-runs/${conflict.workflow_run_id}`}
-                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 shadow-md transition flex items-center space-x-1.5"
+                  className="px-4 py-2 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-canvas shadow-md transition flex items-center space-x-1.5"
                 >
                   <span>Open Existing Workflow</span>
                   <span>→</span>
@@ -219,12 +219,12 @@ export default function IdeaDetailPage({
         )}
 
         {/* Idea Header & Action */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-line">
           <div className="space-y-3 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-snug">
+            <h1 className="text-2xl sm:text-3xl font-bold text-strong tracking-tight leading-snug">
               {idea.title}
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted">
               Captured {new Date(idea.created_at).toLocaleString(undefined, {
                 dateStyle: "medium",
                 timeStyle: "short",
@@ -238,8 +238,8 @@ export default function IdeaDetailPage({
               disabled={mutation.isPending}
               className={`px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition flex items-center space-x-2 ${
                 mutation.isPending
-                  ? "bg-indigo-700/50 text-indigo-300 cursor-not-allowed"
-                  : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30"
+                  ? "bg-accent-hover/50 text-accent-soft cursor-not-allowed"
+                  : "bg-accent hover:bg-accent-hover text-strong shadow-indigo-600/30"
               }`}
             >
               {mutation.isPending ? (
@@ -254,7 +254,7 @@ export default function IdeaDetailPage({
                 </>
               )}
             </button>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-subtle">
               Triggers LangGraph Research → Approval workflow
             </span>
           </div>
@@ -263,10 +263,10 @@ export default function IdeaDetailPage({
         {/* Description Section */}
         {idea.description && (
           <div className="space-y-2">
-            <h3 className="text-xs uppercase font-semibold text-slate-400 tracking-wider">
+            <h3 className="text-xs uppercase font-semibold text-muted tracking-wider">
               Idea Narrative
             </h3>
-            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+            <div className="p-4 rounded-xl bg-panel/40 border border-line text-body text-sm leading-relaxed whitespace-pre-wrap">
               {idea.description}
             </div>
           </div>
@@ -275,11 +275,11 @@ export default function IdeaDetailPage({
         {/* Scoring Breakdown */}
         <div className="space-y-4">
           <div className="flex items-baseline justify-between">
-            <h3 className="text-xs uppercase font-semibold text-slate-400 tracking-wider">
+            <h3 className="text-xs uppercase font-semibold text-muted tracking-wider">
               Scoring Breakdown
             </h3>
             <div className="flex items-center space-x-2">
-              <span className="text-xs text-slate-400">Final Composite:</span>
+              <span className="text-xs text-muted">Final Composite:</span>
               <span className="text-base font-bold text-emerald-400 font-mono">
                 {idea.final_score != null ? (idea.final_score * 100).toFixed(1) : "N/A"}
               </span>
@@ -316,20 +316,20 @@ export default function IdeaDetailPage({
         </div>
 
         {/* Source Provenance */}
-        <div className="space-y-3 pt-4 border-t border-slate-800">
-          <h3 className="text-xs uppercase font-semibold text-slate-400 tracking-wider">
+        <div className="space-y-3 pt-4 border-t border-line">
+          <h3 className="text-xs uppercase font-semibold text-muted tracking-wider">
             Source Provenance ({sources?.length || 0})
           </h3>
 
           {isSourcesLoading && (
-            <div className="py-6 flex items-center justify-center space-x-2 text-xs text-slate-500">
-              <div className="h-4 w-4 rounded-full border border-indigo-500 border-t-transparent animate-spin" />
+            <div className="py-6 flex items-center justify-center space-x-2 text-xs text-subtle">
+              <div className="h-4 w-4 rounded-full border border-accent border-t-transparent animate-spin" />
               <span>Loading provenance data...</span>
             </div>
           )}
 
           {!isSourcesLoading && (!sources || sources.length === 0) && (
-            <div className="p-4 rounded-lg bg-slate-900/30 border border-slate-800 text-xs text-slate-500">
+            <div className="p-4 rounded-lg bg-panel/30 border border-line text-xs text-subtle">
               No linked source items found for this idea.
             </div>
           )}
@@ -339,22 +339,22 @@ export default function IdeaDetailPage({
               {sources.map((src) => (
                 <div
                   key={src.id}
-                  className="p-3.5 rounded-lg bg-slate-900/50 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  className="p-3.5 rounded-lg bg-panel/50 border border-line/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-indigo-400 border border-slate-700">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-raised text-accent-text border border-line-strong">
                         {src.source_type}
                       </span>
                       {src.author && (
-                        <span className="text-xs text-slate-400">by {src.author}</span>
+                        <span className="text-xs text-muted">by {src.author}</span>
                       )}
                     </div>
                     <a
                       href={src.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs sm:text-sm font-medium text-slate-200 hover:text-indigo-400 transition truncate block"
+                      className="text-xs sm:text-sm font-medium text-body-strong hover:text-accent-text transition truncate block"
                     >
                       {src.title || src.url}
                     </a>
@@ -363,7 +363,7 @@ export default function IdeaDetailPage({
                     href={src.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-medium shrink-0 flex items-center space-x-1"
+                    className="text-xs text-accent-text hover:text-accent-soft font-medium shrink-0 flex items-center space-x-1"
                   >
                     <span>Inspect</span>
                     <span>↗</span>

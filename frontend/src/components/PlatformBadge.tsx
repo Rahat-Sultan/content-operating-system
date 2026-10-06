@@ -86,7 +86,7 @@ export function PlatformLogo({ platform, size = 14 }: { platform: string; size?:
 }
 
 export function PlatformBadge({ platform, muted = false }: { platform: string; muted?: boolean }) {
-  const tone = TONE[platform] ?? "bg-slate-800 text-slate-300 border-slate-700";
+  const tone = TONE[platform] ?? "bg-raised text-body border-line-strong";
   return (
     <span
       data-testid="platform-badge"

@@ -179,19 +179,19 @@ export default function StrategyDetailPage({
 
   if (isStrategyLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="text-slate-500 text-sm">Loading strategy...</div>
+      <div className="min-h-screen bg-canvas text-strong flex items-center justify-center">
+        <div className="text-subtle text-sm">Loading strategy...</div>
       </div>
     );
   }
 
   if (isError || !strategy) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8">
+      <div className="min-h-screen bg-canvas text-strong p-8">
         <div className="max-w-2xl mx-auto p-4 bg-rose-950/40 border border-rose-800 rounded-lg text-rose-300">
           Error loading strategy: {(error as Error)?.message || "Strategy not found"}
           <div className="mt-4">
-            <Link href="/strategies" className="text-xs text-indigo-400 hover:underline">
+            <Link href="/strategies" className="text-xs text-accent-text hover:underline">
               ← Back to Strategies
             </Link>
           </div>
@@ -201,13 +201,13 @@ export default function StrategyDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-16">
+    <div className="min-h-screen bg-canvas text-strong pb-16">
       {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
           <Link
             href="/strategies"
-            className="text-xs font-medium text-slate-400 hover:text-slate-200 transition"
+            className="text-xs font-medium text-muted hover:text-body-strong transition"
           >
             ← Back to Strategies
           </Link>
@@ -215,19 +215,19 @@ export default function StrategyDetailPage({
         <div className="flex items-center space-x-6">
           <Link
             href="/sources"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Sources
           </Link>
           <Link
             href="/strategies"
-            className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="text-sm font-medium text-accent-text hover:text-accent-soft transition-colors"
           >
             Strategies
           </Link>
           <Link
             href="/ideas"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Ideas
           </Link>
@@ -247,7 +247,7 @@ export default function StrategyDetailPage({
             </div>
             <button
               onClick={() => setDiscoverySuccessMsg(null)}
-              className="text-slate-400 hover:text-slate-200 text-xs ml-4"
+              className="text-muted hover:text-body-strong text-xs ml-4"
             >
               ✕
             </button>
@@ -259,7 +259,7 @@ export default function StrategyDetailPage({
             <p>{formError}</p>
             <button
               onClick={() => setFormError(null)}
-              className="text-slate-400 hover:text-slate-200 text-xs ml-4"
+              className="text-muted hover:text-body-strong text-xs ml-4"
             >
               ✕
             </button>
@@ -267,24 +267,24 @@ export default function StrategyDetailPage({
         )}
 
         {/* Strategy Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-line">
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-white tracking-tight">
+              <h2 className="text-2xl font-bold text-strong tracking-tight">
                 {strategy.name}
               </h2>
               <span
                 className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border ${
                   strategy.enabled
                     ? "bg-emerald-950/60 text-emerald-300 border-emerald-800"
-                    : "bg-slate-800 text-slate-400 border-slate-700"
+                    : "bg-raised text-muted border-line-strong"
                 }`}
               >
                 {strategy.enabled ? "Active" : "Disabled"}
               </span>
             </div>
             {strategy.description && (
-              <p className="text-sm text-slate-400 mt-1">{strategy.description}</p>
+              <p className="text-sm text-muted mt-1">{strategy.description}</p>
             )}
           </div>
 
@@ -293,7 +293,7 @@ export default function StrategyDetailPage({
               <>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                  className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-raised hover:bg-raised-strong text-body-strong border border-line-strong transition"
                 >
                   Edit Configuration
                 </button>
@@ -304,7 +304,7 @@ export default function StrategyDetailPage({
                     discoveryMutation.mutate();
                   }}
                   disabled={discoveryMutation.isPending || !strategy.enabled}
-                  className="px-4 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-md text-xs font-semibold bg-accent hover:bg-accent-hover text-strong shadow-md shadow-accent/20 transition disabled:opacity-50"
                 >
                   {discoveryMutation.isPending ? "Running Discovery..." : "Run Discovery"}
                 </button>
@@ -312,7 +312,7 @@ export default function StrategyDetailPage({
             ) : (
               <button
                 onClick={() => setIsEditing(false)}
-                className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-raised hover:bg-raised-strong text-body-strong border border-line-strong transition"
               >
                 Cancel Edit
               </button>
@@ -323,78 +323,78 @@ export default function StrategyDetailPage({
         {/* Read-Only Configuration Overview */}
         {!isEditing ? (
           <div className="mt-8 space-y-6">
-            <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4">
+            <section className="bg-panel/60 border border-line rounded-xl p-6">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted mb-4">
                 Strategy Configuration
               </h3>
               <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div>
-                  <dt className="text-slate-500">Niche</dt>
-                  <dd className="text-slate-200 font-medium text-sm mt-0.5">
+                  <dt className="text-subtle">Niche</dt>
+                  <dd className="text-body-strong font-medium text-sm mt-0.5">
                     {strategy.config?.niche || "Not specified"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Target Audience</dt>
-                  <dd className="text-slate-200 font-medium text-sm mt-0.5">
+                  <dt className="text-subtle">Target Audience</dt>
+                  <dd className="text-body-strong font-medium text-sm mt-0.5">
                     {strategy.config?.audience || "Not specified"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Tone</dt>
-                  <dd className="text-slate-300 mt-0.5">
+                  <dt className="text-subtle">Tone</dt>
+                  <dd className="text-body mt-0.5">
                     {strategy.config?.tone || "Default"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Target Platforms</dt>
-                  <dd className="text-slate-300 mt-0.5">
+                  <dt className="text-subtle">Target Platforms</dt>
+                  <dd className="text-body mt-0.5">
                     {(strategy.config?.platforms || ["LinkedIn"]).join(", ")}
                   </dd>
                 </div>
                 <div className="col-span-full">
-                  <dt className="text-slate-500">Core Topics</dt>
+                  <dt className="text-subtle">Core Topics</dt>
                   <dd className="mt-1 flex flex-wrap gap-1.5">
                     {(strategy.config?.topics || []).length > 0 ? (
                       strategy.config?.topics?.map((t: string, i: number) => (
                         <span
                           key={i}
-                          className="px-2.5 py-1 rounded bg-slate-800 text-slate-200 border border-slate-700 text-xs"
+                          className="px-2.5 py-1 rounded bg-raised text-body-strong border border-line-strong text-xs"
                         >
                           {t}
                         </span>
                       ))
                     ) : (
-                      <span className="text-slate-500 italic">No topics configured</span>
+                      <span className="text-subtle italic">No topics configured</span>
                     )}
                   </dd>
                 </div>
                 <div className="col-span-full">
-                  <dt className="text-slate-500">Goals</dt>
+                  <dt className="text-subtle">Goals</dt>
                   <dd className="mt-1 flex flex-wrap gap-1.5">
                     {(strategy.config?.goals || []).length > 0 ? (
                       strategy.config?.goals?.map((g: string, i: number) => (
                         <span
                           key={i}
-                          className="px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 border border-slate-700/60 text-xs"
+                          className="px-2 py-0.5 rounded bg-raised/80 text-body border border-line-strong/60 text-xs"
                         >
                           {g}
                         </span>
                       ))
                     ) : (
-                      <span className="text-slate-500 italic">No explicit goals specified</span>
+                      <span className="text-subtle italic">No explicit goals specified</span>
                     )}
                   </dd>
                 </div>
                 <div className="col-span-full">
-                  <dt className="text-slate-500">Voice / Style Sample</dt>
+                  <dt className="text-subtle">Voice / Style Sample</dt>
                   <dd className="mt-1">
                     {strategy.config?.voice_sample ? (
-                      <pre className="text-xs bg-slate-950 p-3 rounded-lg border border-slate-800 text-slate-300 font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      <pre className="text-xs bg-canvas p-3 rounded-lg border border-line text-body font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
                         {strategy.config.voice_sample}
                       </pre>
                     ) : (
-                      <span className="text-slate-500 italic text-xs">No voice sample provided</span>
+                      <span className="text-subtle italic text-xs">No voice sample provided</span>
                     )}
                   </dd>
                 </div>
@@ -402,16 +402,16 @@ export default function StrategyDetailPage({
             </section>
 
             {/* Scheduled Discovery & Last Run (CP-2C.1) */}
-            <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-6" data-testid="discovery-schedule-card">
+            <section className="bg-panel/60 border border-line rounded-xl p-6" data-testid="discovery-schedule-card">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">
                   Discovery Schedule & Background Polling
                 </h3>
                 <span
                   className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
                     strategy.schedule_info?.is_scheduled
-                      ? "bg-indigo-950/60 text-indigo-300 border-indigo-800"
-                      : "bg-slate-800 text-slate-400 border-slate-700"
+                      ? "bg-accent/15/60 text-accent-soft border-accent/50"
+                      : "bg-raised text-muted border-line-strong"
                   }`}
                   data-testid="schedule-status-badge"
                 >
@@ -420,28 +420,28 @@ export default function StrategyDetailPage({
                     : "Schedule Disabled"}
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2 border-t border-slate-800/80">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-2 border-t border-line/80">
                 <div>
-                  <div className="text-slate-500">Configured Interval</div>
-                  <div className="text-slate-200 font-medium mt-0.5" data-testid="schedule-interval-value">
+                  <div className="text-subtle">Configured Interval</div>
+                  <div className="text-body-strong font-medium mt-0.5" data-testid="schedule-interval-value">
                     {strategy.schedule_info?.interval_hours
                       ? `${strategy.schedule_info.interval_hours} hour(s)`
                       : "Manual trigger only (interval not set)"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-slate-500">Last Scheduled Run</div>
-                  <div className="text-slate-200 font-medium mt-0.5" data-testid="schedule-last-run-value">
+                  <div className="text-subtle">Last Scheduled Run</div>
+                  <div className="text-body-strong font-medium mt-0.5" data-testid="schedule-last-run-value">
                     {strategy.schedule_info?.last_run ? (
                       <span>
                         {new Date(strategy.schedule_info.last_run.completed_at || "").toLocaleString()}{" "}
-                        <span className="text-slate-400 text-[11px]">
+                        <span className="text-muted text-[11px]">
                           ({strategy.schedule_info.last_run.items_found || 0} items fetched,{" "}
                           {strategy.schedule_info.last_run.ideas_created || 0} ideas created)
                         </span>
                       </span>
                     ) : (
-                      <span className="text-slate-500 italic">No scheduled runs recorded yet</span>
+                      <span className="text-subtle italic">No scheduled runs recorded yet</span>
                     )}
                   </div>
                 </div>
@@ -449,50 +449,50 @@ export default function StrategyDetailPage({
             </section>
 
             {/* Attached Sources */}
-            <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-6">
+            <section className="bg-panel/60 border border-line rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">
                   Attached Sources ({strategy.sources?.length || 0})
                 </h3>
               </div>
-              <p className="text-xs text-slate-400 mb-4">
+              <p className="text-xs text-muted mb-4">
                 When you click "Run Discovery", Content OS ingests and scores signals strictly from these sources for this strategy.
               </p>
               {strategy.sources && strategy.sources.length > 0 ? (
-                <div className="divide-y divide-slate-800 border border-slate-800 rounded-lg overflow-hidden">
+                <div className="divide-y divide-slate-800 border border-line rounded-lg overflow-hidden">
                   {strategy.sources.map((src) => (
                     <div
                       key={src.id}
-                      className="p-3 bg-slate-950/60 flex items-center justify-between text-xs"
+                      className="p-3 bg-canvas/60 flex items-center justify-between text-xs"
                     >
                       <div>
-                        <div className="font-medium text-slate-200">{src.name}</div>
+                        <div className="font-medium text-body-strong">{src.name}</div>
                         {src.url && (
-                          <div className="text-slate-500 text-[11px] font-mono mt-0.5">
+                          <div className="text-subtle text-[11px] font-mono mt-0.5">
                             {src.url}
                           </div>
                         )}
                       </div>
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[10px] uppercase">
+                      <span className="px-2 py-0.5 rounded bg-raised text-muted border border-line-strong text-[10px] uppercase">
                         {src.source_type}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="p-4 border border-dashed border-slate-800 rounded-lg text-center text-slate-500 text-xs">
+                <div className="p-4 border border-dashed border-line rounded-lg text-center text-subtle text-xs">
                   No sources attached to this strategy. Click "Edit Configuration" to attach sources.
                 </div>
               )}
             </section>
 
             {/* Ideas from this strategy (after discovery) */}
-            <section data-testid="strategy-ideas" className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
+            <section data-testid="strategy-ideas" className="bg-panel/60 border border-line rounded-xl p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">
                   Ideas from this strategy ({strategyIdeas?.length ?? 0})
                 </h3>
-                <Link href="/ideas" className="text-xs text-indigo-400 hover:underline">All ideas →</Link>
+                <Link href="/ideas" className="text-xs text-accent-text hover:underline">All ideas →</Link>
               </div>
               {strategyIdeas && strategyIdeas.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3">
@@ -504,18 +504,18 @@ export default function StrategyDetailPage({
                         key={idea.id}
                         href={`/ideas/${idea.id}`}
                         data-testid="strategy-idea-card"
-                        className="group block p-4 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition shadow-sm"
+                        className="group block p-4 rounded-xl bg-panel/70 border border-line hover:border-line-strong hover:bg-panel transition shadow-sm"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                              <span className="px-2 py-0.5 rounded border border-slate-700 text-slate-300">{idea.status}</span>
+                            <div className="flex items-center gap-2 text-[11px] text-subtle">
+                              <span className="px-2 py-0.5 rounded border border-line-strong text-body">{idea.status}</span>
                               <span>{new Date(idea.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
                             </div>
-                            <h4 className="text-sm font-semibold text-slate-100 group-hover:text-indigo-400 transition-colors truncate">{idea.title}</h4>
+                            <h4 className="text-sm font-semibold text-strong group-hover:text-accent-text transition-colors truncate">{idea.title}</h4>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Score</span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-subtle block">Score</span>
                             <span className="text-base font-bold text-emerald-400">
                               {idea.final_score !== null && idea.final_score !== undefined ? (idea.final_score * 100).toFixed(1) : "N/A"}
                             </span>
@@ -525,7 +525,7 @@ export default function StrategyDetailPage({
                     ))}
                 </div>
               ) : (
-                <div className="p-4 border border-dashed border-slate-800 rounded-lg text-center text-slate-500 text-xs">
+                <div className="p-4 border border-dashed border-line rounded-lg text-center text-subtle text-xs">
                   No ideas yet. Run discovery to create ideas from this strategy's sources.
                 </div>
               )}
@@ -534,13 +534,13 @@ export default function StrategyDetailPage({
         ) : (
           /* Edit Form */
           <form onSubmit={handleSave} className="mt-8 space-y-6 text-xs">
-            <section className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-white pb-2 border-b border-slate-800">
+            <section className="bg-panel/60 border border-line rounded-xl p-6 space-y-4">
+              <h3 className="text-sm font-semibold text-strong pb-2 border-b border-line">
                 Edit Strategy
               </h3>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Strategy Name *
                 </label>
                 <input
@@ -548,93 +548,93 @@ export default function StrategyDetailPage({
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Description
                 </label>
                 <textarea
                   rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Niche</label>
+                  <label className="block text-body font-medium mb-1">Niche</label>
                   <input
                     type="text"
                     value={formData.niche}
                     onChange={(e) => setFormData({ ...formData, niche: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Audience</label>
+                  <label className="block text-body font-medium mb-1">Audience</label>
                   <input
                     type="text"
                     value={formData.audience}
                     onChange={(e) => setFormData({ ...formData, audience: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Topics (comma-separated)
                 </label>
                 <input
                   type="text"
                   value={formData.topics}
                   onChange={(e) => setFormData({ ...formData, topics: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Goals (comma-separated)
                 </label>
                 <input
                   type="text"
                   value={formData.goals}
                   onChange={(e) => setFormData({ ...formData, goals: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Tone</label>
+                  <label className="block text-body font-medium mb-1">Tone</label>
                   <input
                     type="text"
                     value={formData.tone}
                     onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Platforms</label>
+                  <label className="block text-body font-medium mb-1">Platforms</label>
                   <input
                     type="text"
                     value={formData.platforms}
                     onChange={(e) => setFormData({ ...formData, platforms: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Voice / Style Sample (Optional)
                 </label>
-                <p className="text-slate-500 text-[11px] mb-1.5">
+                <p className="text-subtle text-[11px] mb-1.5">
                   Paste an excerpt of real writing you want the Writer to emulate (tone, sentence rhythm, and vocabulary).
                 </p>
                 <textarea
@@ -642,15 +642,15 @@ export default function StrategyDetailPage({
                   placeholder="Paste an excerpt of how you or your team actually write..."
                   value={formData.voice_sample}
                   onChange={(e) => setFormData({ ...formData, voice_sample: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent font-mono text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Scheduled Discovery Interval (Hours)
                 </label>
-                <p className="text-slate-500 text-[11px] mb-1.5">
+                <p className="text-subtle text-[11px] mb-1.5">
                   Interval in hours between automated background discovery runs (e.g. 1, 4, 24). Leave blank to disable automated scheduling.
                 </p>
                 <input
@@ -662,40 +662,40 @@ export default function StrategyDetailPage({
                   onChange={(e) =>
                     setFormData({ ...formData, discovery_interval_hours: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent font-mono text-xs"
                   data-testid="schedule-interval-input"
                 />
               </div>
 
               {/* Source Attachment Selector */}
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Attached Sources (Strategy Isolation)
                 </label>
-                <p className="text-slate-500 text-[11px] mb-2">
+                <p className="text-subtle text-[11px] mb-2">
                   Select which sources feed into this strategy. Only these sources will be read during discovery.
                 </p>
-                <div className="border border-slate-800 rounded-md p-2 bg-slate-950 max-h-48 overflow-y-auto space-y-1">
+                <div className="border border-line rounded-md p-2 bg-canvas max-h-48 overflow-y-auto space-y-1">
                   {availableSources && availableSources.length > 0 ? (
                     availableSources.map((source) => (
                       <label
                         key={source.id}
-                        className="flex items-center space-x-2 text-slate-300 hover:text-white cursor-pointer py-1.5 px-2 rounded hover:bg-slate-900"
+                        className="flex items-center space-x-2 text-body hover:text-strong cursor-pointer py-1.5 px-2 rounded hover:bg-panel"
                       >
                         <input
                           type="checkbox"
                           checked={formData.source_ids.includes(source.id)}
                           onChange={() => handleSourceToggle(source.id)}
-                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-line-strong text-accent focus:ring-indigo-500"
                         />
                         <span className="font-medium text-xs">{source.name}</span>
-                        <span className="text-slate-500 text-[10px]">
+                        <span className="text-subtle text-[10px]">
                           ({source.source_type} - {source.url || "no URL"})
                         </span>
                       </label>
                     ))
                   ) : (
-                    <div className="text-slate-500 text-center py-2">
+                    <div className="text-subtle text-center py-2">
                       No sources available
                     </div>
                   )}
@@ -708,25 +708,25 @@ export default function StrategyDetailPage({
                   id="enabled_edit"
                   checked={formData.enabled}
                   onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                  className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-line-strong text-accent focus:ring-indigo-500"
                 />
-                <label htmlFor="enabled_edit" className="text-slate-300">
+                <label htmlFor="enabled_edit" className="text-body">
                   Enable strategy for discovery
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition"
+                  className="px-4 py-2 rounded-md bg-raised hover:bg-raised-strong text-body font-medium transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={updateMutation.isPending}
-                  className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  className="px-4 py-2 rounded-md bg-accent hover:bg-accent-hover text-strong font-medium shadow-md shadow-accent/20 transition disabled:opacity-50"
                 >
                   {updateMutation.isPending ? "Saving..." : "Save Changes"}
                 </button>

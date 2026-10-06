@@ -159,32 +159,32 @@ export default function StrategiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-canvas text-strong">
       {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
           <img src="/logo.svg" alt="Content OS" className="h-8 w-8 shrink-0" />
           <div>
-            <h1 className="text-lg font-semibold text-white tracking-tight">Content OS</h1>
-            <p className="text-xs text-slate-400">Autonomous Content Intelligence Engine</p>
+            <h1 className="text-lg font-semibold text-strong tracking-tight">Content OS</h1>
+            <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
         <nav className="flex items-center space-x-6">
           <Link
             href="/sources"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Sources
           </Link>
           <Link
             href="/strategies"
-            className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="text-sm font-medium text-accent-text hover:text-accent-soft transition-colors"
           >
             Strategies
           </Link>
           <Link
             href="/ideas"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Ideas
           </Link>
@@ -193,23 +193,23 @@ export default function StrategiesPage() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Content Strategies</h2>
-            <p className="text-sm text-slate-400 mt-1">
+            <h2 className="text-2xl font-bold text-strong tracking-tight">Content Strategies</h2>
+            <p className="text-sm text-muted mt-1">
               Define niches, target audiences, and attached sources to govern discovery and production.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => refetch()}
-              className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              className="px-3.5 py-1.5 rounded-md text-xs font-medium bg-raised hover:bg-raised-strong text-body-strong border border-line-strong transition"
             >
               Refresh
             </button>
             <button
               onClick={() => setShowModal(true)}
-              className="px-4 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition"
+              className="px-4 py-1.5 rounded-md text-xs font-semibold bg-accent hover:bg-accent-hover text-strong shadow-md shadow-accent/20 transition"
             >
               + New Strategy
             </button>
@@ -226,15 +226,15 @@ export default function StrategiesPage() {
               data-testid={`strategies-view-${v}`}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                 view === v
-                  ? "bg-indigo-600 border-indigo-500 text-white"
-                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+                  ? "bg-accent border-accent text-strong"
+                  : "bg-panel border-line text-muted hover:text-body-strong"
               }`}
             >
               {v === "active" ? "Active" : "Rejected (archive)"}
             </button>
           ))}
           {view === "archive" && (
-            <span className="text-[11px] text-slate-500 ml-2">
+            <span className="text-[11px] text-subtle ml-2">
               Archived strategies are kept, not deleted. Restore one to bring it back.
             </span>
           )}
@@ -242,7 +242,7 @@ export default function StrategiesPage() {
 
         {/* Loading / Error States */}
         {isLoading && (
-          <div className="py-20 text-center text-slate-500 text-sm">
+          <div className="py-20 text-center text-subtle text-sm">
             Loading strategies...
           </div>
         )}
@@ -257,7 +257,7 @@ export default function StrategiesPage() {
         {!isLoading && !isError && strategies && (
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             {strategies.length === 0 ? (
-              <div className="col-span-full py-16 text-center text-slate-500 border border-dashed border-slate-800 rounded-xl">
+              <div className="col-span-full py-16 text-center text-subtle border border-dashed border-line rounded-xl">
                 No strategies configured yet. Click "+ New Strategy" to create one.
               </div>
             ) : (
@@ -268,7 +268,7 @@ export default function StrategiesPage() {
                 const sourcesCount = strategy.sources?.length || 0;
 
                 return (
-                  <div key={strategy.id} className="rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 transition-all duration-200">
+                  <div key={strategy.id} className="rounded-xl bg-panel/60 border border-line hover:border-accent/50 transition-all duration-200">
                   <Link
                     href={`/strategies/${strategy.id}`}
                     className="group block p-5"
@@ -276,41 +276,41 @@ export default function StrategiesPage() {
                     <div className="flex items-start justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-slate-100 group-hover:text-indigo-400 transition-colors">
+                          <h3 className="font-semibold text-strong group-hover:text-accent-text transition-colors">
                             {strategy.name}
                           </h3>
                           <span
                             className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
                               strategy.enabled
                                 ? "bg-emerald-950/60 text-emerald-300 border-emerald-800"
-                                : "bg-slate-800 text-slate-400 border-slate-700"
+                                : "bg-raised text-muted border-line-strong"
                             }`}
                           >
                             {strategy.enabled ? "Active" : "Disabled"}
                           </span>
                         </div>
                         {strategy.description && (
-                          <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                          <p className="text-xs text-muted mt-1 line-clamp-2">
                             {strategy.description}
                           </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-xs">
+                    <div className="mt-4 pt-3 border-t border-line/80 grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <span className="text-slate-500">Niche:</span>{" "}
-                        <span className="text-slate-300 font-medium">{niche}</span>
+                        <span className="text-subtle">Niche:</span>{" "}
+                        <span className="text-body font-medium">{niche}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500">Sources:</span>{" "}
-                        <span className="text-slate-300 font-medium">
+                        <span className="text-subtle">Sources:</span>{" "}
+                        <span className="text-body font-medium">
                           {sourcesCount} attached
                         </span>
                       </div>
                       <div className="col-span-2">
-                        <span className="text-slate-500">Audience:</span>{" "}
-                        <span className="text-slate-300">{audience}</span>
+                        <span className="text-subtle">Audience:</span>{" "}
+                        <span className="text-body">{audience}</span>
                       </div>
                     </div>
 
@@ -319,13 +319,13 @@ export default function StrategiesPage() {
                         {topics.slice(0, 3).map((topic, i) => (
                           <span
                             key={i}
-                            className="text-[10px] px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 border border-slate-700/60"
+                            className="text-[10px] px-2 py-0.5 rounded bg-raised/80 text-body border border-line-strong/60"
                           >
                             {topic}
                           </span>
                         ))}
                         {topics.length > 3 && (
-                          <span className="text-[10px] px-1.5 py-0.5 text-slate-500">
+                          <span className="text-[10px] px-1.5 py-0.5 text-subtle">
                             +{topics.length - 3} more
                           </span>
                         )}
@@ -340,7 +340,7 @@ export default function StrategiesPage() {
                       <button
                         onClick={() => act.mutate({ id: strategy.id, kind: "archive" })}
                         disabled={act.isPending}
-                        className="px-3 py-1 rounded-md text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                        className="px-3 py-1 rounded-md text-xs border border-line-strong text-body hover:bg-raised disabled:opacity-50"
                       >
                         Archive
                       </button>
@@ -349,7 +349,7 @@ export default function StrategiesPage() {
                         <button
                           onClick={() => act.mutate({ id: strategy.id, kind: "restore" })}
                           disabled={act.isPending}
-                          className="px-3 py-1 rounded-md text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                          className="px-3 py-1 rounded-md text-xs border border-line-strong text-body hover:bg-raised disabled:opacity-50"
                         >
                           Restore
                         </button>
@@ -374,12 +374,12 @@ export default function StrategiesPage() {
       {/* Create Strategy Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-xl w-full p-6 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <h3 className="text-lg font-semibold text-white">Create Content Strategy</h3>
+          <div className="bg-panel border border-line rounded-xl max-w-xl w-full p-6 shadow-2xl my-8">
+            <div className="flex items-center justify-between pb-4 border-b border-line">
+              <h3 className="text-lg font-semibold text-strong">Create Content Strategy</h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-200 text-sm"
+                className="text-muted hover:text-body-strong text-sm"
               >
                 ✕
               </button>
@@ -393,7 +393,7 @@ export default function StrategiesPage() {
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Strategy Name *
                 </label>
                 <input
@@ -402,12 +402,12 @@ export default function StrategiesPage() {
                   placeholder="e.g. Cloud Native Infrastructure"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Description
                 </label>
                 <textarea
@@ -415,35 +415,35 @@ export default function StrategiesPage() {
                   placeholder="High-level purpose of this content strategy"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Niche</label>
+                  <label className="block text-body font-medium mb-1">Niche</label>
                   <input
                     type="text"
                     placeholder="e.g. Kubernetes, AI Agents"
                     value={formData.niche}
                     onChange={(e) => setFormData({ ...formData, niche: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Audience</label>
+                  <label className="block text-body font-medium mb-1">Audience</label>
                   <input
                     type="text"
                     placeholder="e.g. Senior Staff Engineers"
                     value={formData.audience}
                     onChange={(e) => setFormData({ ...formData, audience: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Topics (comma-separated)
                 </label>
                 <input
@@ -451,38 +451,38 @@ export default function StrategiesPage() {
                   placeholder="e.g. eBPF, Distributed Systems, Reliability"
                   value={formData.topics}
                   onChange={(e) => setFormData({ ...formData, topics: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Tone</label>
+                  <label className="block text-body font-medium mb-1">Tone</label>
                   <input
                     type="text"
                     placeholder="e.g. Authoritative, rigorous"
                     value={formData.tone}
                     onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Platforms</label>
+                  <label className="block text-body font-medium mb-1">Platforms</label>
                   <input
                     type="text"
                     placeholder="e.g. LinkedIn, Twitter"
                     value={formData.platforms}
                     onChange={(e) => setFormData({ ...formData, platforms: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Voice / Style Sample (Optional)
                 </label>
-                <p className="text-slate-500 text-[11px] mb-1.5">
+                <p className="text-subtle text-[11px] mb-1.5">
                   Paste an excerpt of real writing you want the Writer to emulate (tone, sentence rhythm, and vocabulary).
                 </p>
                 <textarea
@@ -490,36 +490,36 @@ export default function StrategiesPage() {
                   placeholder="Paste an excerpt of how you or your team actually write..."
                   value={formData.voice_sample}
                   onChange={(e) => setFormData({ ...formData, voice_sample: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500 font-mono text-xs"
+                  className="w-full bg-canvas border border-line rounded-md px-3 py-2 text-strong focus:outline-none focus:border-accent font-mono text-xs"
                 />
               </div>
 
               {/* Attach Sources */}
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
+                <label className="block text-body font-medium mb-1">
                   Attach Sources (for Discovery)
                 </label>
-                <div className="border border-slate-800 rounded-md p-2 bg-slate-950 max-h-32 overflow-y-auto space-y-1">
+                <div className="border border-line rounded-md p-2 bg-canvas max-h-32 overflow-y-auto space-y-1">
                   {availableSources && availableSources.length > 0 ? (
                     availableSources.map((source) => (
                       <label
                         key={source.id}
-                        className="flex items-center space-x-2 text-slate-300 hover:text-white cursor-pointer py-1 px-1 rounded hover:bg-slate-900"
+                        className="flex items-center space-x-2 text-body hover:text-strong cursor-pointer py-1 px-1 rounded hover:bg-panel"
                       >
                         <input
                           type="checkbox"
                           checked={formData.source_ids.includes(source.id)}
                           onChange={() => handleSourceToggle(source.id)}
-                          className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-line-strong text-accent focus:ring-indigo-500"
                         />
                         <span className="font-medium">{source.name}</span>
-                        <span className="text-slate-500 text-[10px]">
+                        <span className="text-subtle text-[10px]">
                           ({source.source_type})
                         </span>
                       </label>
                     ))
                   ) : (
-                    <div className="text-slate-500 text-center py-2">
+                    <div className="text-subtle text-center py-2">
                       No sources available
                     </div>
                   )}
@@ -532,25 +532,25 @@ export default function StrategiesPage() {
                   id="enabled"
                   checked={formData.enabled}
                   onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-                  className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-line-strong text-accent focus:ring-indigo-500"
                 />
-                <label htmlFor="enabled" className="text-slate-300">
+                <label htmlFor="enabled" className="text-body">
                   Enable strategy for discovery
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition"
+                  className="px-4 py-2 rounded-md bg-raised hover:bg-raised-strong text-body font-medium transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={createMutation.isPending}
-                  className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  className="px-4 py-2 rounded-md bg-accent hover:bg-accent-hover text-strong font-medium shadow-md shadow-accent/20 transition disabled:opacity-50"
                 >
                   {createMutation.isPending ? "Creating..." : "Create Strategy"}
                 </button>

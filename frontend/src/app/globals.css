@@ -1,26 +1,77 @@
 @import "tailwindcss";
 
+/*
+ * Content OS theme. The one place colours are defined. Pages use these names
+ * (bg-canvas, bg-panel, text-muted, border-line, bg-accent ...), not raw Tailwind colours.
+ * Values are the palette from the approved board design (option D).
+ */
+@theme {
+  /* Surfaces */
+  --color-canvas: #0f0f12;        /* page background */
+  --color-panel: #18181b;         /* cards, columns, panels */
+  --color-raised: #27272a;        /* buttons, chips, hover fills */
+  --color-raised-strong: #3f3f46; /* strong borders and bars */
+
+  /* Lines */
+  --color-line: #27272a;
+  --color-line-strong: #3f3f46;
+
+  /* Text, strongest to faintest */
+  --color-strong: #f4f4f5;
+  --color-body-strong: #e4e4e7;
+  --color-body: #d4d4d8;
+  --color-muted: #a1a1aa;
+  --color-subtle: #71717a;
+  --color-faint: #52525b;
+
+  /* Accent (actions, selected states, strategy tags) */
+  --color-accent: #7c3aed;
+  --color-accent-hover: #8b5cf6;
+  --color-accent-text: #a78bfa;
+  --color-accent-soft: #c4b5fd;
+
+  /* Status (reserved: never used as decoration) */
+  --color-good: #34d399;
+  --color-warn: #fbbf24;
+  --color-bad: #fb7185;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-body-strong);
+  font-family: var(--font-sans);
+}
+
+/* Shared component classes for patterns used on every page */
+@layer components {
+  .cos-card {
+    @apply rounded-xl border border-line bg-panel;
+  }
+  .cos-btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-line-strong bg-raised px-3 py-1.5 text-xs font-semibold text-body-strong transition-colors hover:bg-raised-strong disabled:opacity-50;
+  }
+  .cos-btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50;
+  }
+  .cos-btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-bad/40 px-3 py-1.5 text-xs font-semibold text-bad transition-colors hover:bg-bad/10 disabled:opacity-50;
+  }
+  .cos-tag {
+    @apply rounded px-1.5 py-0.5 text-[11px] font-medium bg-accent/15 text-accent-soft;
+  }
+  .cos-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle;
+  }
+  .cos-input {
+    @apply w-full rounded-md border border-line-strong bg-canvas px-3 py-2 text-sm text-strong placeholder:text-faint focus:border-accent focus:outline-none;
+  }
+  .cos-header {
+    @apply sticky top-0 z-10 flex items-center justify-between border-b border-line bg-panel/80 px-6 py-4 backdrop-blur;
+  }
 }

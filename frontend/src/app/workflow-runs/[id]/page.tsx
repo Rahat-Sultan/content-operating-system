@@ -20,15 +20,15 @@ import {
 } from "@/lib/api";
 
 const STATUS_BADGE_STYLES: Record<string, string> = {
-  PENDING: "bg-slate-800 text-slate-300 border-slate-700",
+  PENDING: "bg-raised text-body border-line-strong",
   RUNNING: "bg-blue-900/60 text-blue-300 border-blue-700/50 animate-pulse",
   PAUSED: "bg-amber-900/60 text-amber-300 border-amber-700/50",
   NEEDS_REVIEW: "bg-amber-500/20 text-amber-300 border-amber-500/50 animate-pulse",
-  PUBLISHING: "bg-indigo-900/60 text-indigo-300 border-indigo-700/50 animate-pulse",
+  PUBLISHING: "bg-accent/25/60 text-accent-soft border-indigo-700/50 animate-pulse",
   COMPLETED: "bg-emerald-900/60 text-emerald-300 border-emerald-700/50",
   FAILED: "bg-rose-900/60 text-rose-300 border-rose-700/50",
   REJECTED: "bg-rose-950 text-rose-400 border-rose-800",
-  CANCELLED: "bg-slate-800 text-slate-400 border-slate-700",
+  CANCELLED: "bg-raised text-muted border-line-strong",
 };
 
 /** Impressions over time for valid snapshots. One series, so no legend; end values labeled. */
@@ -40,7 +40,7 @@ function SnapshotTrend({ snapshots }: { snapshots: { collected_at: string; metri
   if (points.length === 0) return null;
   if (points.length === 1) {
     return (
-      <p className="text-[11px] text-slate-400" data-testid="snapshot-trend-empty">
+      <p className="text-[11px] text-muted" data-testid="snapshot-trend-empty">
         One snapshot so far: {points[0].v} impressions on {fmtDateTime(points[0].at)}. A trend appears after a second snapshot.
       </p>
     );
@@ -54,7 +54,7 @@ function SnapshotTrend({ snapshots }: { snapshots: { collected_at: string; metri
   const last = points[points.length - 1];
   return (
     <div data-testid="snapshot-trend" className="space-y-1">
-      <div className="text-[11px] font-semibold text-slate-400">Impressions over time (valid snapshots)</div>
+      <div className="text-[11px] font-semibold text-muted">Impressions over time (valid snapshots)</div>
       <div className="relative">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img"
           aria-label={`Impressions from ${points[0].v} to ${last.v} over ${points.length} snapshots`}>
@@ -71,7 +71,7 @@ function SnapshotTrend({ snapshots }: { snapshots: { collected_at: string; metri
           <text x={x(last.t) + 8} y={y(last.v) + 4} className="fill-slate-200" fontSize="11">{last.v}</text>
         </svg>
         {hover !== null && (
-          <div className="absolute top-0 left-0 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-[11px] text-slate-200 font-mono pointer-events-none"
+          <div className="absolute top-0 left-0 px-2 py-1 rounded bg-canvas border border-line-strong text-[11px] text-body-strong font-mono pointer-events-none"
             style={{ left: `${(x(points[hover].t) / W) * 100}%`, transform: "translate(-50%, -110%)" }}>
             {points[hover].v} impressions · {fmtDateTime(points[hover].at)}
           </div>
@@ -340,10 +340,10 @@ export default function WorkflowRunDetailPage({
 
   if (isRunLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-canvas text-strong flex items-center justify-center">
         <div className="flex flex-col items-center space-y-3">
-          <div className="h-7 w-7 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-          <p className="text-sm text-slate-400">Loading workflow run {id}...</p>
+          <div className="h-7 w-7 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+          <p className="text-sm text-muted">Loading workflow run {id}...</p>
         </div>
       </div>
     );
@@ -351,7 +351,7 @@ export default function WorkflowRunDetailPage({
 
   if (isRunError || !run) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 max-w-4xl mx-auto">
+      <div className="min-h-screen bg-canvas text-strong p-8 max-w-4xl mx-auto">
         <div className="p-4 rounded-lg bg-rose-950/40 border border-rose-800 text-rose-300">
           <h2 className="font-semibold text-sm">Failed to load workflow run</h2>
           <p className="text-xs mt-1 text-rose-400">
@@ -359,7 +359,7 @@ export default function WorkflowRunDetailPage({
           </p>
           <Link
             href="/ideas"
-            className="inline-block mt-4 text-xs font-semibold text-indigo-400 hover:underline"
+            className="inline-block mt-4 text-xs font-semibold text-accent-text hover:underline"
           >
             ← Back to Ideas
           </Link>
@@ -369,15 +369,15 @@ export default function WorkflowRunDetailPage({
   }
 
   const badgeStyle =
-    STATUS_BADGE_STYLES[run.status] || "bg-slate-800 text-slate-300 border-slate-700";
+    STATUS_BADGE_STYLES[run.status] || "bg-raised text-body border-line-strong";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+    <div className="min-h-screen bg-canvas text-strong pb-20">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
           <Link
             href={`/ideas/${run.idea_id}`}
-            className="text-xs font-medium text-slate-400 hover:text-slate-200 transition"
+            className="text-xs font-medium text-muted hover:text-body-strong transition"
           >
             ← Back to Idea
           </Link>
@@ -428,7 +428,7 @@ export default function WorkflowRunDetailPage({
             }}
             disabled={isRefreshing}
             data-testid="header-refresh-btn"
-            className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 border border-slate-700 flex items-center space-x-1.5 transition active:scale-95"
+            className="text-xs px-2.5 py-1 rounded bg-raised hover:bg-raised-strong disabled:opacity-50 text-body border border-line-strong flex items-center space-x-1.5 transition active:scale-95"
           >
             {isRefreshing ? (
               <>
@@ -447,15 +447,15 @@ export default function WorkflowRunDetailPage({
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
         {/* Header Block */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-line">
           <div className="space-y-1">
-            <span className="text-xs font-mono text-slate-400">Run ID: {run.id}</span>
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+            <span className="text-xs font-mono text-muted">Run ID: {run.id}</span>
+            <h1 className="text-2xl font-bold text-strong tracking-tight">
               {idea ? idea.title : "Production Workflow Execution"}
             </h1>
             {idea && (
-              <p className="text-xs text-slate-400 mt-1">
-                Strategy ID: <span className="font-mono text-slate-300">{idea.strategy_id}</span>
+              <p className="text-xs text-muted mt-1">
+                Strategy ID: <span className="font-mono text-body">{idea.strategy_id}</span>
               </p>
             )}
           </div>
@@ -470,23 +470,23 @@ export default function WorkflowRunDetailPage({
 
         {/* Phase / Execution Info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-            <span className="text-xs uppercase font-medium text-slate-500">Current Phase</span>
-            <p className="text-base font-semibold text-slate-200 font-mono">
+          <div className="p-4 rounded-xl bg-panel/60 border border-line space-y-1">
+            <span className="text-xs uppercase font-medium text-subtle">Current Phase</span>
+            <p className="text-base font-semibold text-body-strong font-mono">
               {run.current_phase || (run.status === "NEEDS_REVIEW" ? "APPROVAL_REVIEW" : run.status)}
             </p>
           </div>
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1">
-            <span className="text-xs uppercase font-medium text-slate-500">Started At</span>
-            <p className="text-sm font-semibold text-slate-200">
+          <div className="p-4 rounded-xl bg-panel/60 border border-line space-y-1">
+            <span className="text-xs uppercase font-medium text-subtle">Started At</span>
+            <p className="text-sm font-semibold text-body-strong">
               {new Date(run.started_at).toLocaleString()}
             </p>
           </div>
         </div>
 
         {run.resolved_at && (
-          <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
-            <span className="text-xs uppercase font-medium text-slate-500">Resolved At</span>
+          <div className="p-4 rounded-xl bg-panel/40 border border-line">
+            <span className="text-xs uppercase font-medium text-subtle">Resolved At</span>
             <p className="text-sm font-semibold text-emerald-400 mt-1">
               {new Date(run.resolved_at).toLocaleString()}
             </p>
@@ -535,7 +535,7 @@ export default function WorkflowRunDetailPage({
             )}
 
             <div className="space-y-2">
-              <label className="block text-xs font-medium text-slate-300">
+              <label className="block text-xs font-medium text-body">
                 Editorial Feedback / Revision Instructions (optional for Approve, recommended for Revision):
               </label>
               <textarea
@@ -543,7 +543,7 @@ export default function WorkflowRunDetailPage({
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder="Enter specific feedback or revision requirements for the Writer agent..."
                 rows={2}
-                className="w-full text-xs rounded-lg bg-slate-900 border border-slate-700 p-2.5 text-slate-200 focus:outline-none focus:border-amber-500 transition"
+                className="w-full text-xs rounded-lg bg-panel border border-line-strong p-2.5 text-body-strong focus:outline-none focus:border-amber-500 transition"
               />
             </div>
 
@@ -551,7 +551,7 @@ export default function WorkflowRunDetailPage({
               <button
                 onClick={() => approvalMutation.mutate({ decision: "APPROVED" })}
                 disabled={approvalMutation.isPending || !draft}
-                className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-strong shadow transition flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <span>✓</span>
                 <span>Approve Draft</span>
@@ -560,7 +560,7 @@ export default function WorkflowRunDetailPage({
               <button
                 onClick={() => approvalMutation.mutate({ decision: "REVISION_REQUESTED" })}
                 disabled={approvalMutation.isPending || !draft}
-                className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-strong shadow transition flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <span>↺</span>
                 <span>Request Revision</span>
@@ -569,14 +569,14 @@ export default function WorkflowRunDetailPage({
               <button
                 onClick={() => approvalMutation.mutate({ decision: "REJECTED" })}
                 disabled={approvalMutation.isPending || !draft}
-                className="px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow transition flex items-center space-x-1.5 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-strong shadow transition flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <span>✕</span>
                 <span>Reject Draft</span>
               </button>
 
               {approvalMutation.isPending && (
-                <span className="text-xs text-slate-400 flex items-center space-x-2">
+                <span className="text-xs text-muted flex items-center space-x-2">
                   <div className="h-3.5 w-3.5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
                   <span>Submitting decision & resuming graph...</span>
                 </span>
@@ -589,39 +589,39 @@ export default function WorkflowRunDetailPage({
         {publication && (
           <section className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted">
                 Publication Dispatch Status
               </h2>
-              <span className={`px-2.5 py-0.5 rounded text-[11px] font-semibold border ${STATUS_BADGE_STYLES[publication.status] || "bg-slate-800 text-slate-300 border-slate-700"}`}>
+              <span className={`px-2.5 py-0.5 rounded text-[11px] font-semibold border ${STATUS_BADGE_STYLES[publication.status] || "bg-raised text-body border-line-strong"}`}>
                 {publication.status}
               </span>
             </div>
-            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3 shadow">
+            <div className="p-4 rounded-xl bg-panel/60 border border-line space-y-3 shadow">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     Platform
                   </span>
-                  <span className="text-slate-200 capitalize font-medium">{publication.platform}</span>
+                  <span className="text-body-strong capitalize font-medium">{publication.platform}</span>
                 </div>
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     External Post ID
                   </span>
-                  <span className="text-slate-200 font-mono text-[11px] truncate block" title={publication.external_id || "None"}>
+                  <span className="text-body-strong font-mono text-[11px] truncate block" title={publication.external_id || "None"}>
                     {publication.external_id || "—"}
                   </span>
                 </div>
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     Idempotency Key
                   </span>
-                  <span className="text-slate-300 font-mono text-[11px] truncate block" title={publication.idempotency_key}>
+                  <span className="text-body font-mono text-[11px] truncate block" title={publication.idempotency_key}>
                     {publication.idempotency_key}
                   </span>
                 </div>
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     Published At
                   </span>
                   <span className="text-emerald-400 font-medium">
@@ -631,12 +631,12 @@ export default function WorkflowRunDetailPage({
               </div>
               {publication.url && (
                 <div className="pt-1 flex items-center space-x-2 text-xs">
-                  <span className="text-slate-400">Post URL:</span>
+                  <span className="text-muted">Post URL:</span>
                   <a
                     href={publication.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-indigo-400 hover:text-indigo-300 underline font-mono truncate"
+                    className="text-accent-text hover:text-accent-soft underline font-mono truncate"
                   >
                     {publication.url}
                   </a>
@@ -650,27 +650,27 @@ export default function WorkflowRunDetailPage({
 
               {/* Metrics & Analytics Section */}
               {publication.status === "PUBLISHED" && (
-                <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-4">
+                <div className="mt-4 pt-4 border-t border-line/80 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-body">
                         Publication Metrics & Analytics
                       </h3>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-subtle">
                         Real performance metrics polled from Buffer
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
                     <button
                       onClick={() => setShowManualMetricsForm(!showManualMetricsForm)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-semibold transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-line-strong hover:bg-raised text-body-strong text-xs font-semibold transition-colors"
                     >
                       {showManualMetricsForm ? "Cancel manual entry" : "Enter metrics from LinkedIn"}
                     </button>
                     <button
                       onClick={() => syncMetricsMutation.mutate()}
                       disabled={syncMetricsMutation.isPending}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 text-strong text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
                     >
                       {syncMetricsMutation.isPending ? (
                         <>
@@ -711,7 +711,7 @@ export default function WorkflowRunDetailPage({
                       state === "network_error" || state === "failed" || state === "deleted_upstream"
                         ? "bg-rose-950/40 border-rose-800 text-rose-200"
                         : state === "available" || state === "manual"
-                        ? "bg-slate-900/60 border-slate-800 text-slate-200"
+                        ? "bg-panel/60 border-line text-body-strong"
                         : "bg-amber-950/30 border-amber-800/80 text-amber-200";
                     const reason =
                       state === "not_collected_yet"
@@ -742,9 +742,9 @@ export default function WorkflowRunDetailPage({
                             ["Comments", metrics?.comments],
                             ["Shares", metrics?.shares],
                           ].map(([label, value]) => (
-                            <div key={label as string} className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                              <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">{label}</span>
-                              <span className="text-lg font-bold text-slate-100 font-mono">
+                            <div key={label as string} className="p-3 rounded-lg bg-canvas/70 border border-line">
+                              <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">{label}</span>
+                              <span className="text-lg font-bold text-strong font-mono">
                                 {showNumbers ? ((value as number | undefined) ?? 0) : "—"}
                               </span>
                             </div>
@@ -760,7 +760,7 @@ export default function WorkflowRunDetailPage({
                               Sync Metrics ({fmtDateTime(new Date().toISOString())}): {syncError}
                             </p>
                           )}
-                          <div className="text-[11px] font-mono space-y-1 pt-1 text-slate-400">
+                          <div className="text-[11px] font-mono space-y-1 pt-1 text-muted">
                             <div>Last attempt: {lastAttempt}</div>
                             <div>Last successful Buffer response: {fmtDateTime(status?.last_buffer_response_at, "none")}</div>
                             {status && !status.scheduler_running && status.next_sync_at && (
@@ -785,10 +785,10 @@ export default function WorkflowRunDetailPage({
                         </div>
 
                         {/* Manual Metrics Entry Bar / Form (CP-1.5) */}
-                        <div className="pt-2 border-t border-slate-800/60 flex flex-col space-y-3">
+                        <div className="pt-2 border-t border-line/60 flex flex-col space-y-3">
                           {showManualMetricsForm && (
-                            <div className="p-4 rounded-lg bg-slate-950/80 border border-slate-800 space-y-3">
-                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                            <div className="p-4 rounded-lg bg-canvas/80 border border-line space-y-3">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-body">
                                 Record Manual Snapshot from LinkedIn
                               </h4>
                               {manualError && (
@@ -796,53 +796,53 @@ export default function WorkflowRunDetailPage({
                               )}
                               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
                                 <div>
-                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Impressions</label>
+                                  <label className="text-[10px] text-muted uppercase block mb-1">Impressions</label>
                                   <input
                                     type="number"
                                     min="0"
                                     value={manualImpressions}
                                     onChange={(e) => setManualImpressions(Math.max(0, parseInt(e.target.value) || 0))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                    className="w-full bg-panel border border-line-strong rounded px-2.5 py-1 text-strong font-mono text-xs"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Reactions</label>
+                                  <label className="text-[10px] text-muted uppercase block mb-1">Reactions</label>
                                   <input
                                     type="number"
                                     min="0"
                                     value={manualReactions}
                                     onChange={(e) => setManualReactions(Math.max(0, parseInt(e.target.value) || 0))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                    className="w-full bg-panel border border-line-strong rounded px-2.5 py-1 text-strong font-mono text-xs"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Comments</label>
+                                  <label className="text-[10px] text-muted uppercase block mb-1">Comments</label>
                                   <input
                                     type="number"
                                     min="0"
                                     value={manualComments}
                                     onChange={(e) => setManualComments(Math.max(0, parseInt(e.target.value) || 0))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                    className="w-full bg-panel border border-line-strong rounded px-2.5 py-1 text-strong font-mono text-xs"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Clicks</label>
+                                  <label className="text-[10px] text-muted uppercase block mb-1">Clicks</label>
                                   <input
                                     type="number"
                                     min="0"
                                     value={manualClicks}
                                     onChange={(e) => setManualClicks(Math.max(0, parseInt(e.target.value) || 0))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                    className="w-full bg-panel border border-line-strong rounded px-2.5 py-1 text-strong font-mono text-xs"
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Shares</label>
+                                  <label className="text-[10px] text-muted uppercase block mb-1">Shares</label>
                                   <input
                                     type="number"
                                     min="0"
                                     value={manualShares}
                                     onChange={(e) => setManualShares(Math.max(0, parseInt(e.target.value) || 0))}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                    className="w-full bg-panel border border-line-strong rounded px-2.5 py-1 text-strong font-mono text-xs"
                                   />
                                 </div>
                               </div>
@@ -850,7 +850,7 @@ export default function WorkflowRunDetailPage({
                                 <button
                                   onClick={() => manualMetricsMutation.mutate()}
                                   disabled={manualMetricsMutation.isPending}
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold shadow transition"
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-strong text-xs font-semibold shadow transition"
                                 >
                                   {manualMetricsMutation.isPending ? "Saving..." : "Save Manual Snapshot"}
                                 </button>
@@ -863,26 +863,26 @@ export default function WorkflowRunDetailPage({
                         {validSnapshots.length > 0 && <SnapshotTrend snapshots={validSnapshots} />}
 
                         {allSnapshots.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-slate-800/60">
+                          <div className="mt-3 pt-3 border-t border-line/60">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-[11px] font-semibold text-slate-400">
+                              <span className="text-[11px] font-semibold text-muted">
                                 Historical Snapshots ({visibleSnapshots.length})
                               </span>
                               {hiddenCount > 0 && (
                                 <button
                                   onClick={() => setShowInvalidRows(!showInvalidRows)}
-                                  className="text-[10px] text-slate-400 hover:text-slate-200 underline"
+                                  className="text-[10px] text-muted hover:text-body-strong underline"
                                 >
                                   {showInvalidRows ? "Hide test / invalid rows" : `Show test / invalid rows (${hiddenCount})`}
                                 </button>
                               )}
                               {isAnalyticsLoading && (
-                                <span className="text-[10px] text-slate-500 animate-pulse">Refreshing...</span>
+                                <span className="text-[10px] text-subtle animate-pulse">Refreshing...</span>
                               )}
                             </div>
-                            <div className="overflow-x-auto rounded-lg border border-slate-800/80 bg-slate-950/40">
+                            <div className="overflow-x-auto rounded-lg border border-line/80 bg-canvas/40">
                               <table className="w-full text-left text-xs">
-                                <thead className="bg-slate-900/80 text-[10px] uppercase text-slate-500 border-b border-slate-800/80">
+                                <thead className="bg-panel/80 text-[10px] uppercase text-subtle border-b border-line/80">
                                   <tr>
                                     <th className="py-2 px-3 font-semibold">Collected At</th>
                                     <th className="py-2 px-3 font-semibold">Provider</th>
@@ -899,11 +899,11 @@ export default function WorkflowRunDetailPage({
                                     const isQuarantined = !!snap.metrics.invalid_reason;
                                     const isStub = !!snap.metrics.is_stub;
                                     return (
-                                      <tr key={snap.id} className="hover:bg-slate-900/40">
-                                        <td className="py-2 px-3 text-slate-300 whitespace-nowrap">
+                                      <tr key={snap.id} className="hover:bg-panel/40">
+                                        <td className="py-2 px-3 text-body whitespace-nowrap">
                                           {new Date(snap.collected_at).toLocaleString()}
                                         </td>
-                                        <td className="py-2 px-3 text-slate-400">
+                                        <td className="py-2 px-3 text-muted">
                                           {isStub ? (
                                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950/60 text-amber-400 border border-amber-800/60">stub</span>
                                           ) : snap.metrics.provider === "manual" ? (
@@ -911,24 +911,24 @@ export default function WorkflowRunDetailPage({
                                               manual
                                             </span>
                                           ) : (
-                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950/60 text-indigo-300 border border-indigo-800/60">
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/15/60 text-accent-soft border border-accent/50/60">
                                               {snap.metrics.provider || "buffer"}
                                             </span>
                                           )}
                                         </td>
-                                        <td className="py-2 px-3 text-right text-slate-200">
+                                        <td className="py-2 px-3 text-right text-body-strong">
                                           {snap.metrics.impressions ?? 0}
                                         </td>
-                                        <td className="py-2 px-3 text-right text-slate-200">
+                                        <td className="py-2 px-3 text-right text-body-strong">
                                           {snap.metrics.clicks ?? 0}
                                         </td>
-                                        <td className="py-2 px-3 text-right text-slate-200">
+                                        <td className="py-2 px-3 text-right text-body-strong">
                                           {snap.metrics.likes ?? snap.metrics.reactions ?? 0}
                                         </td>
-                                        <td className="py-2 px-3 text-right text-slate-200">
+                                        <td className="py-2 px-3 text-right text-body-strong">
                                           {snap.metrics.comments ?? 0}
                                         </td>
-                                        <td className="py-2 px-3 text-right text-slate-200">
+                                        <td className="py-2 px-3 text-right text-body-strong">
                                           {snap.metrics.shares ?? 0}
                                         </td>
                                         <td className="py-2 px-3 text-center">
@@ -941,7 +941,7 @@ export default function WorkflowRunDetailPage({
                                               stub
                                             </span>
                                           ) : (
-                                            <span className="text-[10px] text-slate-400">
+                                            <span className="text-[10px] text-muted">
                                               {snap.metrics.post_status || "synced"}
                                             </span>
                                           )}
@@ -968,16 +968,16 @@ export default function WorkflowRunDetailPage({
         {draft && draft.current_version && (
           <section className="space-y-3 pt-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-muted">
                 Generated Draft (v{draft.current_version.version_number})
               </h2>
-              <span className="text-xs font-mono text-slate-500">
+              <span className="text-xs font-mono text-subtle">
                 Origin: {draft.current_version.origin}
               </span>
             </div>
-            <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4 shadow">
+            <div className="p-5 rounded-xl bg-panel/80 border border-line space-y-4 shadow">
               {draft.current_version.title && (
-                <h3 className="text-base font-bold text-slate-100 border-b border-slate-800 pb-2">
+                <h3 className="text-base font-bold text-strong border-b border-line pb-2">
                   {draft.current_version.title}
                 </h3>
               )}
@@ -999,18 +999,18 @@ export default function WorkflowRunDetailPage({
                 </div>
               )}
 
-              <div className="text-xs leading-relaxed text-slate-300 font-mono whitespace-pre-wrap">
+              <div className="text-xs leading-relaxed text-body font-mono whitespace-pre-wrap">
                 {draft.current_version.body}
               </div>
 
               {/* LinkedIn Plain Text Preview Panel (CP-3.3) */}
-              <div className="mt-4 pt-4 border-t border-slate-800 space-y-3" data-testid="linkedin-preview-panel">
+              <div className="mt-4 pt-4 border-t border-line space-y-3" data-testid="linkedin-preview-panel">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                    <span className="text-xs font-bold uppercase tracking-wider text-accent-text">
                       LinkedIn Preview (Plain Text)
                     </span>
-                    <span className="text-[10px] bg-indigo-950/70 border border-indigo-800 text-indigo-300 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] bg-accent/15/70 border border-accent/50 text-accent-soft px-1.5 py-0.5 rounded">
                       Publish Payload
                     </span>
                   </div>
@@ -1020,7 +1020,7 @@ export default function WorkflowRunDetailPage({
                       className={`font-semibold ${
                         (draft.current_version.char_count ?? draft.linkedin_preview?.length ?? 0) > 3000
                           ? "text-rose-400"
-                          : "text-slate-400"
+                          : "text-muted"
                       }`}
                     >
                       {(draft.current_version.char_count ?? draft.linkedin_preview?.length ?? 0).toLocaleString()} / 3,000 chars
@@ -1039,7 +1039,7 @@ export default function WorkflowRunDetailPage({
 
                 <div
                   data-testid="linkedin-preview-text"
-                  className="p-4 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs text-slate-200 font-sans whitespace-pre-wrap leading-relaxed selection:bg-indigo-900"
+                  className="p-4 rounded-lg bg-canvas/80 border border-line/80 text-xs text-body-strong font-sans whitespace-pre-wrap leading-relaxed selection:bg-accent/25"
                 >
                   {draft.current_version.linkedin_preview || draft.linkedin_preview || draft.current_version.body}
                 </div>
@@ -1048,16 +1048,16 @@ export default function WorkflowRunDetailPage({
 
             {/* Human edit: a new version; the current one is never changed */}
             {run.status === "NEEDS_REVIEW" && (
-              <div data-testid="draft-edit" className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 shadow">
+              <div data-testid="draft-edit" className="p-5 rounded-xl bg-panel/80 border border-line space-y-3 shadow">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">Edit draft</h3>
-                    <p className="text-[11px] text-slate-500">Saves a new version. The version you are reviewing stays as it is.</p>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-body">Edit draft</h3>
+                    <p className="text-[11px] text-subtle">Saves a new version. The version you are reviewing stays as it is.</p>
                   </div>
                   {!editOpen && (
                     <button
                       onClick={openEditor}
-                      className="px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-semibold"
+                      className="px-3 py-1.5 rounded-lg border border-line-strong hover:bg-raised text-body-strong text-xs font-semibold"
                     >
                       Edit draft
                     </button>
@@ -1070,27 +1070,27 @@ export default function WorkflowRunDetailPage({
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                       placeholder="Title (optional)"
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-100"
+                      className="w-full bg-canvas border border-line-strong rounded px-3 py-2 text-sm text-strong"
                     />
                     <textarea
                       aria-label="Body"
                       rows={16}
                       value={editBody}
                       onChange={(e) => setEditBody(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-100 font-mono leading-relaxed"
+                      className="w-full bg-canvas border border-line-strong rounded px-3 py-2 text-sm text-strong font-mono leading-relaxed"
                     />
                     {editError && <p className="text-xs text-rose-400">{editError}</p>}
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setEditOpen(false)}
-                        className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs"
+                        className="px-3 py-1.5 rounded-lg border border-line-strong text-body text-xs"
                       >
                         Cancel
                       </button>
                       <button
                         onClick={() => saveEditMutation.mutate()}
                         disabled={!editBody.trim() || saveEditMutation.isPending}
-                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold"
+                        className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 text-strong text-xs font-semibold"
                       >
                         {saveEditMutation.isPending ? "Saving…" : "Save as new version"}
                       </button>
@@ -1101,20 +1101,20 @@ export default function WorkflowRunDetailPage({
             )}
 
             {/* Media Section */}
-            <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4 shadow">
+            <div className="p-5 rounded-xl bg-panel/80 border border-line space-y-4 shadow">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-body">
                     Media (v{draft.current_version.version_number})
                   </h3>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-subtle">
                     Version-locked visual media asset
                   </p>
                 </div>
                 <button
                   onClick={() => generateMediaMutation.mutate({ regenerate: !!(mediaAssets && mediaAssets.length > 0), prompt: mediaPrompt ?? undefined })}
                   disabled={generateMediaMutation.isPending}
-                  className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 text-strong text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
                 >
                   {generateMediaMutation.isPending ? (
                     <>
@@ -1128,15 +1128,15 @@ export default function WorkflowRunDetailPage({
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="media-prompt" className="text-[11px] text-slate-400 font-semibold">Image prompt</label>
+                <label htmlFor="media-prompt" className="text-[11px] text-muted font-semibold">Image prompt</label>
                 <textarea
                   id="media-prompt"
                   rows={3}
                   value={mediaPrompt ?? (mediaAssets?.[0]?.prompt ?? "")}
                   onChange={(e) => setMediaPrompt(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-xs text-slate-100"
+                  className="w-full bg-canvas border border-line-strong rounded px-3 py-2 text-xs text-strong"
                 />
-                <p className="text-[11px] text-slate-500">Change the prompt, then generate. The result is saved as a new asset.</p>
+                <p className="text-[11px] text-subtle">Change the prompt, then generate. The result is saved as a new asset.</p>
               </div>
 
               {mediaError && (
@@ -1151,11 +1151,11 @@ export default function WorkflowRunDetailPage({
 
                 if (!latestMedia) {
                   return (
-                    <div className="p-6 rounded-lg bg-slate-950/50 border border-slate-800/80 text-center space-y-2">
-                      <p className="text-xs text-slate-400">
+                    <div className="p-6 rounded-lg bg-canvas/50 border border-line/80 text-center space-y-2">
+                      <p className="text-xs text-muted">
                         No image generated for ContentVersion v{draft.current_version.version_number} yet.
                       </p>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-subtle">
                         Click "Generate Image" to create an editorial visual asset for review.
                       </p>
                     </div>
@@ -1164,59 +1164,59 @@ export default function WorkflowRunDetailPage({
 
                 return (
                   <div className="space-y-4">
-                    <div className="rounded-lg overflow-hidden border border-slate-800 bg-slate-950/80">
+                    <div className="rounded-lg overflow-hidden border border-line bg-canvas/80">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`http://localhost:8000${latestMedia.storage_url}`}
                         alt={latestMedia.alt_text || "Generated media asset"}
-                        className="w-full max-h-96 object-contain bg-slate-950"
+                        className="w-full max-h-96 object-contain bg-canvas"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                      <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                        <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">
                           Type
                         </span>
-                        <span className="text-slate-200 font-medium">
+                        <span className="text-body-strong font-medium">
                           {latestMedia.type}
                         </span>
                       </div>
-                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                      <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                        <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">
                           Provider
                         </span>
-                        <span className="text-indigo-300 font-mono text-[11px]">
+                        <span className="text-accent-soft font-mono text-[11px]">
                           {latestMedia.provider}
                         </span>
                         {latestMedia.asset_metadata?.is_stub && (
                           <span className="text-[9px] text-amber-400 block mt-0.5">test stub</span>
                         )}
                       </div>
-                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                      <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                        <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">
                           Status
                         </span>
                         <span className="text-emerald-400 font-medium font-mono text-[11px]">
                           {latestMedia.status}
                         </span>
                       </div>
-                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                      <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                        <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">
                           Generated At
                         </span>
-                        <span className="text-slate-300 font-mono text-[11px]">
+                        <span className="text-body font-mono text-[11px]">
                           {new Date(latestMedia.created_at).toLocaleTimeString()}
                         </span>
                       </div>
                     </div>
 
                     {latestMedia.alt_text && (
-                      <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs">
-                        <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                      <div className="p-3 rounded-lg bg-canvas/60 border border-line/80 text-xs">
+                        <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">
                           Alt Text
                         </span>
-                        <span className="text-slate-300">
+                        <span className="text-body">
                           {latestMedia.alt_text}
                         </span>
                       </div>
@@ -1231,17 +1231,17 @@ export default function WorkflowRunDetailPage({
         {/* Content Brief Section */}
         {brief && (
           <section className="space-y-3 pt-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted">
               Content Brief
             </h2>
-            <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-2">
+            <div className="p-4 rounded-xl bg-panel/50 border border-line space-y-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 {Object.entries(brief.brief).map(([key, value]) => (
-                  <div key={key} className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                    <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                  <div key={key} className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                    <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                       {key.replace(/_/g, " ")}
                     </span>
-                    <span className="text-slate-300">
+                    <span className="text-body">
                       {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value)}
                     </span>
                   </div>
@@ -1254,32 +1254,32 @@ export default function WorkflowRunDetailPage({
         {/* Research Information Section */}
         {research && (
           <section className="space-y-3 pt-2">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted">
               Research Findings
             </h2>
-            <div className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-3">
+            <div className="p-4 rounded-xl bg-panel/50 border border-line space-y-3">
               {research.summary && (
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80 text-xs text-body">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     Summary
                   </span>
                   {research.summary}
                 </div>
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     Key Findings
                   </span>
-                  <pre className="text-slate-300 font-mono text-[11px] whitespace-pre-wrap overflow-x-auto">
+                  <pre className="text-body font-mono text-[11px] whitespace-pre-wrap overflow-x-auto">
                     {JSON.stringify(research.findings, null, 2)}
                   </pre>
                 </div>
-                <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
-                  <span className="text-[11px] uppercase font-semibold text-slate-500 block mb-1">
+                <div className="p-3 rounded-lg bg-canvas/60 border border-line/80">
+                  <span className="text-[11px] uppercase font-semibold text-subtle block mb-1">
                     Sources
                   </span>
-                  <pre className="text-slate-300 font-mono text-[11px] whitespace-pre-wrap overflow-x-auto">
+                  <pre className="text-body font-mono text-[11px] whitespace-pre-wrap overflow-x-auto">
                     {JSON.stringify(research.sources, null, 2)}
                   </pre>
                 </div>

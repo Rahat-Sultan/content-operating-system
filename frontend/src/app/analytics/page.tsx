@@ -46,7 +46,7 @@ function ImpressionsBars({ posts }: { posts: AnalyticsSummaryPost[] }) {
         })}
       </svg>
       {hover !== null && rows[hover] && (
-        <div className="absolute top-0 right-0 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-[11px] text-slate-200 font-mono pointer-events-none">
+        <div className="absolute top-0 right-0 px-2 py-1 rounded bg-canvas border border-line-strong text-[11px] text-body-strong font-mono pointer-events-none">
           {platformLabel(rows[hover].platform)} · {rows[hover].impressions ?? 0} impressions · {rows[hover].reactions ?? 0} reactions · {fmtDate(rows[hover].published_at)}
         </div>
       )}
@@ -67,41 +67,41 @@ export default function AnalyticsPage() {
   const notConnected = tab !== ALL && tabInfo && !tabInfo.connected;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 space-y-6">
+    <div className="min-h-screen bg-canvas text-body-strong p-6 space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-100">Analytics</h1>
-          <p className="text-xs text-slate-500">Newest valid snapshot per published post, by platform</p>
+          <h1 className="text-xl font-bold text-strong">Analytics</h1>
+          <p className="text-xs text-subtle">Newest valid snapshot per published post, by platform</p>
         </div>
         <nav className="flex items-center space-x-6">
-          <Link href="/ideas" className="text-sm font-medium text-slate-400 hover:text-slate-200">Ideas</Link>
-          <Link href="/strategies" className="text-sm font-medium text-slate-400 hover:text-slate-200">Strategies</Link>
+          <Link href="/ideas" className="text-sm font-medium text-muted hover:text-body-strong">Ideas</Link>
+          <Link href="/strategies" className="text-sm font-medium text-muted hover:text-body-strong">Strategies</Link>
         </nav>
       </header>
 
-      <div role="tablist" aria-label="Platform" className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+      <div role="tablist" aria-label="Platform" className="flex flex-wrap gap-2 border-b border-line pb-3">
         <button role="tab" aria-selected={tab === ALL} onClick={() => setTab(ALL)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${tab === ALL ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-700 text-slate-300 hover:bg-slate-800"}`}>
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${tab === ALL ? "bg-accent border-accent text-strong" : "border-line-strong text-body hover:bg-raised"}`}>
           Show all
         </button>
         {(data?.platforms ?? []).map((p) => (
           <button key={p.key} role="tab" aria-selected={tab === p.key} onClick={() => setTab(p.key)}
             data-testid={`tab-${p.key}`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-2 ${tab === p.key ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-700 text-slate-300 hover:bg-slate-800"}`}>
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-2 ${tab === p.key ? "bg-accent border-accent text-strong" : "border-line-strong text-body hover:bg-raised"}`}>
             <PlatformBadge platform={p.key} muted={!p.connected} />
-            <span className="text-slate-400 font-mono">{p.post_count}</span>
-            {!p.connected && <span className="text-[10px] text-slate-500">not connected</span>}
+            <span className="text-muted font-mono">{p.post_count}</span>
+            {!p.connected && <span className="text-[10px] text-subtle">not connected</span>}
           </button>
         ))}
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {isLoading && <p className="text-sm text-subtle">Loading…</p>}
       {error && <p className="text-sm text-rose-400">{(error as Error).message}</p>}
 
       {notConnected && (
-        <section data-testid="platform-not-connected" className="p-5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-          <p className="text-sm font-semibold text-slate-200">{platformLabel(tab)} is not connected</p>
-          <p className="text-xs text-slate-400">
+        <section data-testid="platform-not-connected" className="p-5 rounded-xl bg-panel/60 border border-line space-y-2">
+          <p className="text-sm font-semibold text-body-strong">{platformLabel(tab)} is not connected</p>
+          <p className="text-xs text-muted">
             Content OS only publishes to LinkedIn today (through Buffer). Posts and metrics for {platformLabel(tab)} will appear here after a {platformLabel(tab)} channel is connected. No numbers are shown for it until then.
           </p>
         </section>
@@ -116,20 +116,20 @@ export default function AnalyticsPage() {
               ["Impressions (total)", data.total_impressions],
               ["Reactions (total)", data.total_reactions],
             ].map(([label, value]) => (
-              <div key={label as string} className="p-3 rounded-lg bg-slate-900/70 border border-slate-800">
-                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">{label}</span>
-                <span className="text-lg font-bold text-slate-100 font-mono">{value as number}</span>
+              <div key={label as string} className="p-3 rounded-lg bg-panel/70 border border-line">
+                <span className="text-[10px] uppercase font-semibold text-subtle block mb-1">{label}</span>
+                <span className="text-lg font-bold text-strong font-mono">{value as number}</span>
               </div>
             ))}
           </section>
 
-          <label className="flex items-center space-x-2 text-xs text-slate-400">
+          <label className="flex items-center space-x-2 text-xs text-muted">
             <input type="checkbox" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)} />
             <span>Include test and placeholder publications</span>
           </label>
 
           {data.posts.length === 0 ? (
-            <p className="text-sm text-slate-500" data-testid="analytics-empty">
+            <p className="text-sm text-subtle" data-testid="analytics-empty">
               {tab === ALL ? "No published posts yet." : `No ${platformLabel(tab)} posts yet.`}
             </p>
           ) : (
@@ -139,15 +139,15 @@ export default function AnalyticsPage() {
                   Buffer has not returned metrics for any of these posts yet. Rows show "—", not zero.
                 </p>
               ) : (
-                <section className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-2">
-                  <div className="text-[11px] font-semibold text-slate-400">Impressions per post</div>
+                <section className="p-4 rounded-xl bg-panel/50 border border-line space-y-2">
+                  <div className="text-[11px] font-semibold text-muted">Impressions per post</div>
                   <ImpressionsBars posts={data.posts} />
                 </section>
               )}
 
-              <div className="overflow-x-auto rounded-lg border border-slate-800">
+              <div className="overflow-x-auto rounded-lg border border-line">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-[10px] uppercase text-slate-500 border-b border-slate-800">
+                  <thead className="bg-panel/80 text-[10px] uppercase text-subtle border-b border-line">
                     <tr>
                       <th className="py-2 px-3">Published</th>
                       {tab === ALL && <th className="py-2 px-3">Platform</th>}
@@ -162,7 +162,7 @@ export default function AnalyticsPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
                     {data.posts.map((p) => (
-                      <tr key={p.publication_id} className={p.is_test_post ? "text-slate-500" : ""}>
+                      <tr key={p.publication_id} className={p.is_test_post ? "text-subtle" : ""}>
                         <td className="py-2 px-3 whitespace-nowrap">{fmtDate(p.published_at)}</td>
                         {tab === ALL && <td className="py-2 px-3"><PlatformBadge platform={p.platform} /></td>}
                         <td className="py-2 px-3">{p.is_test_post ? "test · " : ""}{(p.external_id ?? "—").slice(0, 14)}</td>
@@ -173,7 +173,7 @@ export default function AnalyticsPage() {
                         <td className="py-2 px-3 whitespace-nowrap">{fmtDate(p.collected_at)}</td>
                         <td className="py-2 px-3">
                           {p.workflow_run_id ? (
-                            <Link href={`/workflow-runs/${p.workflow_run_id}`} className="text-indigo-400 hover:underline">open</Link>
+                            <Link href={`/workflow-runs/${p.workflow_run_id}`} className="text-accent-text hover:underline">open</Link>
                           ) : "—"}
                         </td>
                       </tr>

@@ -56,12 +56,12 @@ export default function IdeasPage() {
   function Card({ idea }: { idea: IdeaItem }) {
     const score = scoreOf(idea);
     return (
-      <div className="rounded-lg bg-[#0f0f12] border border-zinc-800 hover:border-zinc-600 p-3 space-y-2">
+      <div className="rounded-lg bg-canvas border border-line hover:border-zinc-600 p-3 space-y-2">
         <Link href={`/ideas/${idea.id}`} className="block group">
-          <h4 className="text-[13px] font-semibold leading-snug text-zinc-100 group-hover:text-violet-300 transition-colors">
+          <h4 className="text-[13px] font-semibold leading-snug text-strong group-hover:text-violet-300 transition-colors">
             {idea.title}
           </h4>
-          <div className="mt-2 h-1.5 rounded bg-zinc-800 overflow-hidden">
+          <div className="mt-2 h-1.5 rounded bg-raised overflow-hidden">
             <div
               className="h-full rounded bg-gradient-to-r from-violet-400 to-sky-400"
               style={{ width: `${Math.min(100, Math.max(0, score ?? 0))}%` }}
@@ -77,7 +77,7 @@ export default function IdeasPage() {
           {(idea.platforms ?? []).map((p) => (
             <PlatformBadge key={p} platform={p} />
           ))}
-          <span className="ml-auto font-bold text-zinc-200">{score === null ? "N/A" : score.toFixed(1)}</span>
+          <span className="ml-auto font-bold text-body-strong">{score === null ? "N/A" : score.toFixed(1)}</span>
         </div>
         <div className="flex items-center justify-end gap-2">
           {rowError[idea.id] && <span className="mr-auto text-[11px] text-rose-400">{rowError[idea.id]}</span>}
@@ -85,7 +85,7 @@ export default function IdeasPage() {
             <button
               onClick={() => act.mutate({ id: idea.id, kind: "archive" })}
               disabled={act.isPending}
-              className="px-2 py-0.5 rounded text-[11px] border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-50"
+              className="px-2 py-0.5 rounded text-[11px] border border-line-strong text-muted hover:bg-raised disabled:opacity-50"
             >
               Archive
             </button>
@@ -94,7 +94,7 @@ export default function IdeasPage() {
               <button
                 onClick={() => act.mutate({ id: idea.id, kind: "restore" })}
                 disabled={act.isPending}
-                className="px-2 py-0.5 rounded text-[11px] border border-zinc-700 text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                className="px-2 py-0.5 rounded text-[11px] border border-line-strong text-body hover:bg-raised disabled:opacity-50"
               >
                 Restore
               </button>
@@ -113,38 +113,38 @@ export default function IdeasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f12] text-zinc-100">
+    <div className="min-h-screen bg-canvas text-strong">
       {/* Top Navbar */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
           <img src="/logo.svg" alt="Content OS" className="h-8 w-8 shrink-0" />
           <div>
-            <h1 className="text-lg font-semibold text-white tracking-tight">Content OS</h1>
-            <p className="text-xs text-slate-400">Autonomous Content Intelligence Engine</p>
+            <h1 className="text-lg font-semibold text-strong tracking-tight">Content OS</h1>
+            <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
         <nav className="flex items-center space-x-6">
           <Link
             href="/analytics"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Analytics
           </Link>
           <Link
             href="/sources"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Sources
           </Link>
           <Link
             href="/strategies"
-            className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
           >
             Strategies
           </Link>
           <Link
             href="/ideas"
-            className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="text-sm font-medium text-accent-text hover:text-accent-soft transition-colors"
           >
             Ideas
           </Link>
@@ -155,11 +155,11 @@ export default function IdeasPage() {
       <main className="max-w-[1400px] mx-auto px-6 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">Ideas by stage</h2>
-            <p className="text-sm text-zinc-500 mt-1">Each column is a stage. Highest score first inside each column.</p>
+            <h2 className="text-2xl font-bold text-strong tracking-tight">Ideas by stage</h2>
+            <p className="text-sm text-subtle mt-1">Each column is a stage. Highest score first inside each column.</p>
           </div>
           <div className="flex items-center gap-2">
-            <div role="tablist" className="flex items-center gap-1 rounded-lg border border-zinc-800 p-1">
+            <div role="tablist" className="flex items-center gap-1 rounded-lg border border-line p-1">
               {(["board", "archive"] as const).map((v) => (
                 <button
                   key={v}
@@ -168,7 +168,7 @@ export default function IdeasPage() {
                   onClick={() => setView(v)}
                   data-testid={`ideas-view-${v}`}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    view === v ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-zinc-200"
+                    view === v ? "bg-violet-600 text-strong" : "text-muted hover:text-body-strong"
                   }`}
                 >
                   {v === "board" ? "Board" : `Archive (${archived.length})`}
@@ -177,14 +177,14 @@ export default function IdeasPage() {
             </div>
             <button
               onClick={() => refetch()}
-              className="px-3 py-1.5 rounded-md text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700"
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-raised hover:bg-raised-strong text-body-strong border border-line-strong"
             >
               Refresh
             </button>
           </div>
         </div>
 
-        {isLoading && <p className="py-20 text-center text-sm text-zinc-500">Loading ideas…</p>}
+        {isLoading && <p className="py-20 text-center text-sm text-subtle">Loading ideas…</p>}
         {isError && (
           <div className="my-8 p-4 rounded-lg bg-rose-950/40 border border-rose-800 text-rose-300 text-sm">
             Failed to load ideas: {(error as Error)?.message}
@@ -198,14 +198,14 @@ export default function IdeasPage() {
                 .filter((i) => i.status === stage.status)
                 .sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1));
               return (
-                <section key={stage.status} className="rounded-xl bg-zinc-900 border border-zinc-800 p-3 min-h-[480px]" data-testid={`stage-${stage.status}`}>
-                  <h3 className="flex items-center justify-between px-1 mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                <section key={stage.status} className="rounded-xl bg-panel border border-line p-3 min-h-[480px]" data-testid={`stage-${stage.status}`}>
+                  <h3 className="flex items-center justify-between px-1 mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
                     {stage.label}
-                    <span className="text-zinc-500">{items.length}</span>
+                    <span className="text-subtle">{items.length}</span>
                   </h3>
                   <div className="space-y-2.5">
                     {items.length === 0 ? (
-                      <p className="text-xs text-zinc-600 px-1">No ideas in this stage.</p>
+                      <p className="text-xs text-faint px-1">No ideas in this stage.</p>
                     ) : (
                       items.map((idea) => <Card key={idea.id} idea={idea} />)
                     )}
@@ -218,9 +218,9 @@ export default function IdeasPage() {
 
         {!isLoading && !isError && view === "archive" && (
           <div className="mt-6 space-y-2.5 max-w-3xl">
-            <p className="text-xs text-zinc-500">Archived ideas are kept, not deleted. Restore one to bring it back to the board.</p>
+            <p className="text-xs text-subtle">Archived ideas are kept, not deleted. Restore one to bring it back to the board.</p>
             {archived.length === 0 ? (
-              <p className="py-12 text-center text-sm text-zinc-600 border border-dashed border-zinc-800 rounded-xl">Nothing archived.</p>
+              <p className="py-12 text-center text-sm text-faint border border-dashed border-line rounded-xl">Nothing archived.</p>
             ) : (
               archived.map((idea) => <Card key={idea.id} idea={idea} />)
             )}
