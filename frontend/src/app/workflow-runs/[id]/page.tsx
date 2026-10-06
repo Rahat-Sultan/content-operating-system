@@ -1167,7 +1167,7 @@ export default function WorkflowRunDetailPage({
                     <div className="rounded-lg overflow-hidden border border-line bg-canvas/80">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`http://localhost:8000${latestMedia.storage_url}`}
+                        src={latestMedia.storage_url.startsWith("http") ? latestMedia.storage_url : `http://localhost:8000${latestMedia.storage_url}`}
                         alt={latestMedia.alt_text || "Generated media asset"}
                         className="w-full max-h-96 object-contain bg-canvas"
                       />
