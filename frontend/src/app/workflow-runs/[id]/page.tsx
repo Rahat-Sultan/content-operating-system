@@ -30,6 +30,56 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   CANCELLED: "bg-slate-800 text-slate-400 border-slate-700",
 };
 
+/** Impressions over time for valid snapshots. One series, so no legend; end values labeled. */
+function SnapshotTrend({ snapshots }: { snapshots: { collected_at: string; metrics: Record<string, any> }[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const points = [...snapshots]
+    .map((s) => ({ t: new Date(s.collected_at).getTime(), v: Number(s.metrics.impressions ?? 0), at: s.collected_at }))
+    .sort((a, b) => a.t - b.t);
+  if (points.length === 0) return null;
+  if (points.length === 1) {
+    return (
+      <p className="text-[11px] text-slate-400" data-testid="snapshot-trend-empty">
+        One snapshot so far: {points[0].v} impressions on {fmtDateTime(points[0].at)}. A trend appears after a second snapshot.
+      </p>
+    );
+  }
+  const W = 640, H = 180, PAD_L = 44, PAD_R = 56, PAD_T = 14, PAD_B = 26;
+  const tMin = points[0].t, tMax = points[points.length - 1].t || tMin + 1;
+  const vMax = Math.max(1, ...points.map((p) => p.v));
+  const x = (t: number) => PAD_L + ((t - tMin) / Math.max(1, tMax - tMin)) * (W - PAD_L - PAD_R);
+  const y = (v: number) => PAD_T + (1 - v / vMax) * (H - PAD_T - PAD_B);
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const last = points[points.length - 1];
+  return (
+    <div data-testid="snapshot-trend" className="space-y-1">
+      <div className="text-[11px] font-semibold text-slate-400">Impressions over time (valid snapshots)</div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img"
+          aria-label={`Impressions from ${points[0].v} to ${last.v} over ${points.length} snapshots`}>
+          <line x1={PAD_L} x2={W - PAD_R} y1={y(0)} y2={y(0)} stroke="#334155" />
+          <text x={PAD_L - 6} y={y(vMax) + 4} textAnchor="end" className="fill-slate-500" fontSize="10">{vMax}</text>
+          <text x={PAD_L - 6} y={y(0) + 4} textAnchor="end" className="fill-slate-500" fontSize="10">0</text>
+          <path d={path} fill="none" stroke="#3987e5" strokeWidth="2" />
+          {points.map((p, i) => (
+            <g key={p.at} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+              <circle cx={x(p.t)} cy={y(p.v)} r={hover === i ? 5 : 3.5} fill="#3987e5" />
+              <circle cx={x(p.t)} cy={y(p.v)} r={12} fill="transparent" />
+            </g>
+          ))}
+          <text x={x(last.t) + 8} y={y(last.v) + 4} className="fill-slate-200" fontSize="11">{last.v}</text>
+        </svg>
+        {hover !== null && (
+          <div className="absolute top-0 left-0 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-[11px] text-slate-200 font-mono pointer-events-none"
+            style={{ left: `${(x(points[hover].t) / W) * 100}%`, transform: "translate(-50%, -110%)" }}>
+            {points[hover].v} impressions · {fmtDateTime(points[hover].at)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Local date, time and zone label, e.g. "Oct 6, 2026, 10:04 AM PKT". */
 function fmtDateTime(iso?: string | null, fallback = "—") {
   if (!iso) return fallback;
@@ -701,7 +751,7 @@ export default function WorkflowRunDetailPage({
                                 {status.next_sync_overdue
                                   ? `Overdue since ${fmtDateTime(status.next_sync_at)}`
                                   : `Next sync ${fmtDateTime(status.next_sync_at)}`}
-                                {` · Attempt ${attemptNo} of 6`}
+                                {attemptNo <= 6 ? ` · Attempt ${attemptNo} of 6` : " · Daily check"}
                               </div>
                             )}
                           </div>
@@ -783,6 +833,8 @@ export default function WorkflowRunDetailPage({
                         </div>
 
                         {/* Historical Snapshots Table */}
+                        {validSnapshots.length > 0 && <SnapshotTrend snapshots={validSnapshots} />}
+
                         {allSnapshots.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-slate-800/60">
                             <div className="flex items-center justify-between mb-2">
