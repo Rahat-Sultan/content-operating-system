@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AppNav } from "@/components/AppNav";
 import Link from "next/link";
 import {
   fetchStrategies,
@@ -169,26 +170,7 @@ export default function StrategiesPage() {
             <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
-        <nav className="flex items-center space-x-6">
-          <Link
-            href="/sources"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Sources
-          </Link>
-          <Link
-            href="/strategies"
-            className="text-sm font-medium text-accent-text hover:text-accent-soft transition-colors"
-          >
-            Strategies
-          </Link>
-          <Link
-            href="/ideas"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Ideas
-          </Link>
-        </nav>
+        <AppNav />
       </header>
 
       {/* Main Content Area */}
@@ -337,13 +319,22 @@ export default function StrategiesPage() {
                       <span className="mr-auto text-[11px] text-rose-400">{rowError[strategy.id]}</span>
                     )}
                     {view === "active" ? (
-                      <button
-                        onClick={() => act.mutate({ id: strategy.id, kind: "archive" })}
-                        disabled={act.isPending}
-                        className="px-3 py-1 rounded-md text-xs border border-line-strong text-body hover:bg-raised disabled:opacity-50"
-                      >
-                        Archive
-                      </button>
+                      <>
+                        <button
+                          onClick={() => act.mutate({ id: strategy.id, kind: "archive" })}
+                          disabled={act.isPending}
+                          className="px-3 py-1 rounded-md text-xs border border-line-strong text-body hover:bg-raised disabled:opacity-50"
+                        >
+                          Archive
+                        </button>
+                        <button
+                          onClick={() => confirmDelete(strategy)}
+                          disabled={act.isPending}
+                          className="px-3 py-1 rounded-md text-xs border border-rose-800 text-rose-300 hover:bg-rose-950/50 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </>
                     ) : (
                       <>
                         <button

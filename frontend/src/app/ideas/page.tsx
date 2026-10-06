@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AppNav } from "@/components/AppNav";
 import Link from "next/link";
 import { PlatformBadge } from "@/components/PlatformBadge";
 import { archiveIdea, deleteIdea, fetchIdeas, IdeaItem, restoreIdea } from "@/lib/api";
@@ -82,6 +83,7 @@ export default function IdeasPage() {
         <div className="flex items-center justify-end gap-2">
           {rowError[idea.id] && <span className="mr-auto text-[11px] text-rose-400">{rowError[idea.id]}</span>}
           {view === "board" ? (
+            <>
             <button
               onClick={() => act.mutate({ id: idea.id, kind: "archive" })}
               disabled={act.isPending}
@@ -89,6 +91,14 @@ export default function IdeasPage() {
             >
               Archive
             </button>
+            <button
+              onClick={() => confirmDelete(idea)}
+              disabled={act.isPending}
+              className="px-2 py-0.5 rounded text-[11px] border border-rose-900 text-rose-300 hover:bg-rose-950/50 disabled:opacity-50"
+            >
+              Delete
+            </button>
+            </>
           ) : (
             <>
               <button
@@ -123,32 +133,7 @@ export default function IdeasPage() {
             <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
-        <nav className="flex items-center space-x-6">
-          <Link
-            href="/analytics"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Analytics
-          </Link>
-          <Link
-            href="/sources"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Sources
-          </Link>
-          <Link
-            href="/strategies"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Strategies
-          </Link>
-          <Link
-            href="/ideas"
-            className="text-sm font-medium text-accent-text hover:text-accent-soft transition-colors"
-          >
-            Ideas
-          </Link>
-        </nav>
+        <AppNav />
       </header>
 
       {/* Main Content Area */}

@@ -1,5 +1,6 @@
 "use client";
 
+import { AppNav } from "@/components/AppNav";
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -73,10 +74,7 @@ export default function AnalyticsPage() {
           <h1 className="text-xl font-bold text-strong">Analytics</h1>
           <p className="text-xs text-subtle">Newest valid snapshot per published post, by platform</p>
         </div>
-        <nav className="flex items-center space-x-6">
-          <Link href="/ideas" className="text-sm font-medium text-muted hover:text-body-strong">Ideas</Link>
-          <Link href="/strategies" className="text-sm font-medium text-muted hover:text-body-strong">Strategies</Link>
-        </nav>
+        <AppNav />
       </header>
 
       <div role="tablist" aria-label="Platform" className="flex flex-wrap gap-2 border-b border-line pb-3">

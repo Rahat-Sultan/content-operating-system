@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AppNav } from "@/components/AppNav";
 import Link from "next/link";
 import { fetchSources, createSource, SourceOption, CreateSourcePayload } from "@/lib/api";
 
@@ -79,26 +80,7 @@ export default function SourcesPage() {
             <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
-        <nav className="flex items-center space-x-6">
-          <Link
-            href="/sources"
-            className="text-sm font-medium text-accent-text hover:text-accent-soft transition-colors"
-          >
-            Sources
-          </Link>
-          <Link
-            href="/strategies"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Strategies
-          </Link>
-          <Link
-            href="/ideas"
-            className="text-sm font-medium text-muted hover:text-body-strong transition-colors"
-          >
-            Ideas
-          </Link>
-        </nav>
+        <AppNav />
       </header>
 
       {/* Main Content Area */}
