@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAnalyticsSummary, AnalyticsSummaryPost } from "@/lib/api";
+import { PlatformBadge, platformLabel } from "@/components/PlatformBadge";
 
 const BAR = "#3987e5"; // reference dark categorical slot 1, validated on the app surface
+const ALL = "all";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return "—";
@@ -45,7 +47,7 @@ function ImpressionsBars({ posts }: { posts: AnalyticsSummaryPost[] }) {
       </svg>
       {hover !== null && rows[hover] && (
         <div className="absolute top-0 right-0 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-[11px] text-slate-200 font-mono pointer-events-none">
-          {rows[hover].impressions ?? 0} impressions · {rows[hover].reactions ?? 0} reactions · published {fmtDate(rows[hover].published_at)}
+          {platformLabel(rows[hover].platform)} · {rows[hover].impressions ?? 0} impressions · {rows[hover].reactions ?? 0} reactions · {fmtDate(rows[hover].published_at)}
         </div>
       )}
     </div>
@@ -54,17 +56,22 @@ function ImpressionsBars({ posts }: { posts: AnalyticsSummaryPost[] }) {
 
 export default function AnalyticsPage() {
   const [includeTest, setIncludeTest] = useState(false);
+  const [tab, setTab] = useState<string>(ALL);
+  const platformParam = tab === ALL ? undefined : tab;
   const { data, isLoading, error } = useQuery({
-    queryKey: ["analytics-summary", includeTest],
-    queryFn: () => fetchAnalyticsSummary(includeTest),
+    queryKey: ["analytics-summary", includeTest, platformParam ?? ALL],
+    queryFn: () => fetchAnalyticsSummary(includeTest, platformParam),
   });
+
+  const tabInfo = data?.platforms.find((p) => p.key === tab);
+  const notConnected = tab !== ALL && tabInfo && !tabInfo.connected;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 p-6 space-y-6">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Analytics</h1>
-          <p className="text-xs text-slate-500">Newest valid Buffer or manual snapshot per published post</p>
+          <p className="text-xs text-slate-500">Newest valid snapshot per published post, by platform</p>
         </div>
         <nav className="flex items-center space-x-6">
           <Link href="/ideas" className="text-sm font-medium text-slate-400 hover:text-slate-200">Ideas</Link>
@@ -72,14 +79,39 @@ export default function AnalyticsPage() {
         </nav>
       </header>
 
+      <div role="tablist" aria-label="Platform" className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+        <button role="tab" aria-selected={tab === ALL} onClick={() => setTab(ALL)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${tab === ALL ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-700 text-slate-300 hover:bg-slate-800"}`}>
+          Show all
+        </button>
+        {(data?.platforms ?? []).map((p) => (
+          <button key={p.key} role="tab" aria-selected={tab === p.key} onClick={() => setTab(p.key)}
+            data-testid={`tab-${p.key}`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-2 ${tab === p.key ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-700 text-slate-300 hover:bg-slate-800"}`}>
+            <PlatformBadge platform={p.key} muted={!p.connected} />
+            <span className="text-slate-400 font-mono">{p.post_count}</span>
+            {!p.connected && <span className="text-[10px] text-slate-500">not connected</span>}
+          </button>
+        ))}
+      </div>
+
       {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {error && <p className="text-sm text-rose-400">{(error as Error).message}</p>}
 
-      {data && (
+      {notConnected && (
+        <section data-testid="platform-not-connected" className="p-5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+          <p className="text-sm font-semibold text-slate-200">{platformLabel(tab)} is not connected</p>
+          <p className="text-xs text-slate-400">
+            Content OS only publishes to LinkedIn today (through Buffer). Posts and metrics for {platformLabel(tab)} will appear here after a {platformLabel(tab)} channel is connected. No numbers are shown for it until then.
+          </p>
+        </section>
+      )}
+
+      {data && !notConnected && (
         <>
           <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              ["Published posts", data.post_count],
+              [tab === ALL ? "Published posts" : `${platformLabel(tab)} posts`, data.post_count],
               ["Posts with metrics", data.posts_with_metrics],
               ["Impressions (total)", data.total_impressions],
               ["Reactions (total)", data.total_reactions],
@@ -97,12 +129,14 @@ export default function AnalyticsPage() {
           </label>
 
           {data.posts.length === 0 ? (
-            <p className="text-sm text-slate-500" data-testid="analytics-empty">No published posts yet.</p>
+            <p className="text-sm text-slate-500" data-testid="analytics-empty">
+              {tab === ALL ? "No published posts yet." : `No ${platformLabel(tab)} posts yet.`}
+            </p>
           ) : (
             <>
               {data.posts_with_metrics === 0 ? (
                 <p className="text-sm text-amber-300" data-testid="analytics-no-metrics">
-                  Buffer has not returned metrics for any post yet. Rows show "—", not zero.
+                  Buffer has not returned metrics for any of these posts yet. Rows show "—", not zero.
                 </p>
               ) : (
                 <section className="p-4 rounded-xl bg-slate-900/50 border border-slate-800 space-y-2">
@@ -116,6 +150,7 @@ export default function AnalyticsPage() {
                   <thead className="bg-slate-900/80 text-[10px] uppercase text-slate-500 border-b border-slate-800">
                     <tr>
                       <th className="py-2 px-3">Published</th>
+                      {tab === ALL && <th className="py-2 px-3">Platform</th>}
                       <th className="py-2 px-3">Post</th>
                       <th className="py-2 px-3 text-right">Impressions</th>
                       <th className="py-2 px-3 text-right">Reactions</th>
@@ -129,7 +164,8 @@ export default function AnalyticsPage() {
                     {data.posts.map((p) => (
                       <tr key={p.publication_id} className={p.is_test_post ? "text-slate-500" : ""}>
                         <td className="py-2 px-3 whitespace-nowrap">{fmtDate(p.published_at)}</td>
-                        <td className="py-2 px-3">{p.platform}{p.is_test_post ? " · test" : ""} · {(p.external_id ?? "—").slice(0, 14)}</td>
+                        {tab === ALL && <td className="py-2 px-3"><PlatformBadge platform={p.platform} /></td>}
+                        <td className="py-2 px-3">{p.is_test_post ? "test · " : ""}{(p.external_id ?? "—").slice(0, 14)}</td>
                         <td className="py-2 px-3 text-right">{p.has_snapshot ? p.impressions ?? 0 : "—"}</td>
                         <td className="py-2 px-3 text-right">{p.has_snapshot ? p.reactions ?? 0 : "—"}</td>
                         <td className="py-2 px-3 text-right">{p.has_snapshot ? p.comments ?? 0 : "—"}</td>

@@ -3,6 +3,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 export interface IdeaItem {
   id: string;
   strategy_id: string;
+  /** Target platforms of the idea's strategy, lower case. */
+  platforms?: string[];
   title: string;
   description?: string | null;
   status: "NEW" | "SELECTED" | "IN_PROGRESS" | "PUBLISHED" | "REJECTED" | "EXPIRED";
@@ -602,8 +604,17 @@ export interface AnalyticsSummary {
   posts: AnalyticsSummaryPost[];
 }
 
-export async function fetchAnalyticsSummary(includeTest = false): Promise<AnalyticsSummary> {
-  const res = await fetch(`${API_BASE}/analytics/summary?include_test=${includeTest}`);
+export interface PlatformBreakdown {
+  key: string;
+  label: string;
+  connected: boolean;
+  post_count: number;
+}
+
+export async function fetchAnalyticsSummary(includeTest = false, platform?: string): Promise<AnalyticsSummary & { platform: string | null; platforms: PlatformBreakdown[] }> {
+  const qs = new URLSearchParams({ include_test: String(includeTest) });
+  if (platform) qs.set("platform", platform);
+  const res = await fetch(`${API_BASE}/analytics/summary?${qs.toString()}`);
   if (!res.ok) throw new Error(`Failed to load analytics summary: ${res.statusText}`);
   return res.json();
 }

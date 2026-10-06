@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { PlatformBadge } from "@/components/PlatformBadge";
 import { fetchIdeas, IdeaItem } from "@/lib/api";
 
 const STATUS_FILTERS = [
@@ -186,6 +187,9 @@ export default function IdeasPage() {
                             year: "numeric",
                           })}
                         </span>
+                        {(idea.platforms ?? []).map((p) => (
+                          <PlatformBadge key={p} platform={p} />
+                        ))}
                       </div>
                       <h3 className="text-base font-semibold text-slate-100 group-hover:text-indigo-400 transition-colors">
                         {idea.title}
