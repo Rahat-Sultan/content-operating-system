@@ -43,6 +43,7 @@ class ContentStrategy(Base):
 
     # JSONB: audience, goals, platforms, content_types, topics, tone, voice_guidelines
     config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

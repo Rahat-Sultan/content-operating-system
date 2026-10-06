@@ -53,12 +53,15 @@ def _to_strategy_response(strategy, sources, db: Session | None = None) -> Strat
 @router.get("", response_model=list[StrategyResponse])
 def get_all_strategies(
     enabled_only: bool = Query(False, description="Filter to enabled strategies only"),
+    archived: bool = Query(False, description="True lists the archive (Rejected section) instead"),
     db: Session = Depends(get_db),
 ):
     """
-    List content strategies.
+    List content strategies. Archived strategies are hidden unless archived=true.
     """
+    from app.strategies.models import ContentStrategy
     strategies = list_strategies(db, enabled_only=enabled_only)
+    strategies = [s for s in strategies if (s.archived_at is not None) == archived]
     result = []
     for strat in strategies:
         sources = get_strategy_sources(db, strat.id)
@@ -119,6 +122,25 @@ def update_existing_strategy(
     )
     sources = get_strategy_sources(db, strategy.id)
     return _to_strategy_response(strategy, sources, db=db)
+
+
+@router.post("/{id}/archive", status_code=status.HTTP_204_NO_CONTENT)
+def archive_strategy_endpoint(id: UUID, db: Session = Depends(get_db)):
+    from app.ideas.lifecycle import archive_strategy
+    archive_strategy(db, id)
+
+
+@router.post("/{id}/restore", status_code=status.HTTP_204_NO_CONTENT)
+def restore_strategy_endpoint(id: UUID, db: Session = Depends(get_db)):
+    from app.ideas.lifecycle import restore_strategy
+    restore_strategy(db, id)
+
+
+@router.delete("/{id}")
+def delete_strategy_endpoint(id: UUID, db: Session = Depends(get_db)):
+    """Permanent. Refused (409) if the strategy has any workflow run. Archive instead."""
+    from app.ideas.lifecycle import delete_strategy
+    return delete_strategy(db, id)
 
 
 @router.post("/{id}/discover", response_model=StrategyDiscoveryResult)

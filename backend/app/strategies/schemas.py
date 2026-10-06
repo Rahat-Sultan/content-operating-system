@@ -51,6 +51,7 @@ class StrategyResponse(BaseModel):
     enabled: bool
     sources: list[SourceSummary] = Field(default_factory=list)
     schedule_info: dict[str, Any] | None = None
+    archived_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

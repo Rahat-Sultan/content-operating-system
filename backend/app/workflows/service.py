@@ -291,3 +291,62 @@ def get_draft_for_workflow_run(db: Session, workflow_run_id: UUID) -> tuple[Cont
         .all()
     )
     return content, versions
+
+def create_human_edit_version(
+    db: Session,
+    workflow_run_id: UUID,
+    title: str | None,
+    body: str,
+) -> ContentVersion:
+    """
+    Saves a human edit as a NEW immutable version (origin HUMAN_EDIT). Existing versions
+    are never changed (ADR-008). Allowed only while the run waits for review.
+
+    The run row is locked FOR UPDATE, so an edit and an approval cannot interleave. The
+    UNIQUE (content_id, version_number) constraint also rejects a concurrent second edit.
+    """
+    from app.content.models import ContentVersionOrigin
+
+    run = (
+        db.query(WorkflowRun)
+        .filter(WorkflowRun.id == workflow_run_id)
+        .with_for_update()
+        .first()
+    )
+    if run is None:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=f"Workflow run {workflow_run_id} not found.")
+    if run.status != WorkflowRunStatus.NEEDS_REVIEW:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Drafts can only be edited while the run awaits review (current status: {run.status.value}).",
+        )
+
+    content = db.query(Content).filter(Content.workflow_run_id == workflow_run_id).first()
+    if content is None:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=f"No content found for workflow run {workflow_run_id}.")
+
+    latest = (
+        db.query(ContentVersion)
+        .filter(ContentVersion.content_id == content.id)
+        .order_by(ContentVersion.version_number.desc())
+        .first()
+    )
+    new_version = ContentVersion(
+        id=uuid4(),
+        content_id=content.id,
+        version_number=(latest.version_number + 1) if latest else 1,
+        origin=ContentVersionOrigin.HUMAN_EDIT,
+        title=(title or None),
+        body=body,
+    )
+    db.add(new_version)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Another edit was saved at the same time. Reload and try again.") from exc
+    db.refresh(new_version)
+    return new_version

@@ -75,6 +75,8 @@ def sync_publication_metrics(db: Session, publication_id: UUID) -> Analytics:
         ) from unsupported_err
     except PostNotFoundError as not_found_err:
         logger.error("Post permanently not found for publication %s: %s", publication_id, not_found_err)
+        from app.analytics.upstream import mark_deleted_upstream
+        mark_deleted_upstream(db, publication_id, str(not_found_err))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Post not found on analytics provider (permanent 404): {not_found_err}",

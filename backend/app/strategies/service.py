@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from app.strategies.models import ContentStrategy, strategy_sources_table
 from app.sources.models import Source, SourceItem, idea_source_items_table
 from app.sources.rss_provider import fetch_rss_items
+from app.ideas.lifecycle import add_new_idea_if_unique
 from app.ideas.models import Idea, IdeaStatus
 from app.ideas.scout_provider import execute_scout_and_score
 
@@ -240,8 +241,8 @@ def run_strategy_discovery(
                     final_score=idea_dict["final_score"],
                     scoring_metadata=idea_dict["scoring_metadata"],
                 )
-                db.add(idea)
-                db.flush()
+                if not add_new_idea_if_unique(db, idea):
+                    continue  # this title is already proposed for the strategy
 
                 # Link idea to the source items that backed it
                 indices = idea_dict.get("source_item_indices", [])

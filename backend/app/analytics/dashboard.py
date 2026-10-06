@@ -16,6 +16,11 @@ from app.publishing.platforms import PLATFORMS, normalize_platform
 TEST_ID_PREFIXES = ("linkedin_", "test-ext-", "stub_", "buffer_idea_", "TEMP-")
 
 
+def _deleted_at(pub) -> str | None:
+    from app.analytics.upstream import deleted_upstream_at
+    return deleted_upstream_at(pub)
+
+
 def _is_test_post(external_id: str | None) -> bool:
     return bool(external_id) and external_id.startswith(TEST_ID_PREFIXES)
 
@@ -84,6 +89,7 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
             "shares": m.get("shares"),
             "snapshot_count": counts.get(pub.id, 0),
             "is_test_post": _is_test_post(pub.external_id),
+            "deleted_upstream_at": _deleted_at(pub),
         })
 
     known = [p["key"] for p in PLATFORMS]

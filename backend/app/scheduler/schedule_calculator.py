@@ -77,6 +77,10 @@ def get_next_analytics_sync_time(
     """
     if publication.status.value != "PUBLISHED" or not publication.external_id:
         return None
+    # Gone from the platform: nothing left to measure.
+    from app.analytics.upstream import deleted_upstream_at
+    if deleted_upstream_at(publication):
+        return None
 
     # Never touches publications that are stubs or test mocks (per CP-2B: "Never touches publications that are stubs or have no external ID")
     ext_id = publication.external_id.strip()

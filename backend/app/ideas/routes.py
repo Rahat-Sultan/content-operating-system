@@ -37,6 +37,27 @@ def get_all_ideas(
     return _with_platforms(db, ideas)
 
 
+@router.post("/{id}/archive", response_model=IdeaResponse)
+def archive_idea_endpoint(id: UUID, db: Session = Depends(get_db)):
+    """Moves a NEW or SELECTED idea to the Rejected archive. Reversible."""
+    from app.ideas.lifecycle import archive_idea
+    return _with_platforms(db, [archive_idea(db, id)])[0]
+
+
+@router.post("/{id}/restore", response_model=IdeaResponse)
+def restore_idea_endpoint(id: UUID, db: Session = Depends(get_db)):
+    from app.ideas.lifecycle import restore_idea
+    return _with_platforms(db, [restore_idea(db, id)])[0]
+
+
+@router.delete("/{id}")
+def delete_idea_endpoint(id: UUID, db: Session = Depends(get_db)):
+    """Permanent. Refused (409) if the idea has any workflow run. Archive instead."""
+    from app.ideas.lifecycle import delete_idea
+    delete_idea(db, id)
+    return {"deleted": str(id)}
+
+
 @router.get("/{id}", response_model=IdeaResponse)
 def get_single_idea(
     id: UUID,

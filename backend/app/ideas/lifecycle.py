@@ -1,0 +1,127 @@
+"""
+Idea and strategy lifecycle: archive, restore, delete, and no re-proposed duplicates.
+
+Archive is a status change (ideas -> REJECTED, strategies -> archived_at), reversible.
+Delete is permanent, so it is refused while any workflow run exists, because runs own
+the publications and analytics beneath them.
+"""
+from uuid import UUID
+
+from fastapi import HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.ideas.models import Idea, IdeaStatus
+from app.workflows.models import WorkflowRun
+
+
+def title_already_proposed(db: Session, strategy_id: UUID, title: str) -> bool:
+    """True if the strategy already has an idea with this title, in any status."""
+    return db.query(Idea.id).filter(Idea.strategy_id == strategy_id, Idea.title == title).first() is not None
+
+
+def add_new_idea_if_unique(db: Session, idea: Idea) -> bool:
+    """
+    Adds a discovered idea unless its title is already proposed for the strategy. The
+    partial unique index on NEW ideas backs this up. A race that gets past the check
+    fails the insert, and the savepoint keeps the rest of the discovery run intact.
+    """
+    if title_already_proposed(db, idea.strategy_id, idea.title):
+        return False
+    try:
+        with db.begin_nested():
+            db.add(idea)
+            db.flush()
+    except IntegrityError:
+        return False
+    return True
+
+
+def archive_idea(db: Session, idea_id: UUID) -> Idea:
+    # Atomic: only NEW or SELECTED ideas can be archived. In-progress or published ones cannot.
+    updated = (
+        db.query(Idea)
+        .filter(Idea.id == idea_id, Idea.status.in_([IdeaStatus.NEW, IdeaStatus.SELECTED]))
+        .update({Idea.status: IdeaStatus.REJECTED}, synchronize_session=False)
+    )
+    if updated != 1:
+        db.rollback()
+        current = db.query(Idea).filter(Idea.id == idea_id).first()
+        if current is None:
+            raise HTTPException(status_code=404, detail=f"Idea {idea_id} not found.")
+        raise HTTPException(status_code=409, detail=f"Idea is {current.status.value}; only NEW or SELECTED ideas can be archived.")
+    db.commit()
+    return db.query(Idea).filter(Idea.id == idea_id).one()
+
+
+def restore_idea(db: Session, idea_id: UUID) -> Idea:
+    try:
+        updated = (
+            db.query(Idea)
+            .filter(Idea.id == idea_id, Idea.status == IdeaStatus.REJECTED)
+            .update({Idea.status: IdeaStatus.NEW}, synchronize_session=False)
+        )
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A new idea with this title already exists for the strategy. Archive or delete it first.")
+    if updated != 1:
+        raise HTTPException(status_code=409, detail="Only archived ideas can be restored.")
+    return db.query(Idea).filter(Idea.id == idea_id).one()
+
+
+def delete_idea(db: Session, idea_id: UUID) -> None:
+    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    if idea is None:
+        raise HTTPException(status_code=404, detail=f"Idea {idea_id} not found.")
+    runs = db.query(WorkflowRun).filter(WorkflowRun.idea_id == idea_id).count()
+    if runs:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This idea has {runs} workflow run(s) and their drafts, approvals and publications. Archive it instead; deleting it would remove those records.",
+        )
+    db.delete(idea)
+    db.commit()
+
+
+def archive_strategy(db: Session, strategy_id: UUID) -> None:
+    result = db.execute(
+        text("UPDATE content_strategies SET archived_at = now() WHERE id = :id AND archived_at IS NULL"),
+        {"id": strategy_id},
+    )
+    db.commit()
+    if result.rowcount != 1:
+        raise HTTPException(status_code=409, detail="Strategy is missing or already archived.")
+
+
+def restore_strategy(db: Session, strategy_id: UUID) -> None:
+    result = db.execute(
+        text("UPDATE content_strategies SET archived_at = NULL WHERE id = :id AND archived_at IS NOT NULL"),
+        {"id": strategy_id},
+    )
+    db.commit()
+    if result.rowcount != 1:
+        raise HTTPException(status_code=409, detail="Strategy is missing or not archived.")
+
+
+def delete_strategy(db: Session, strategy_id: UUID) -> dict:
+    """Deletes a strategy and its unrun ideas. Refused if any of its ideas has a workflow run."""
+    from app.strategies.models import ContentStrategy
+    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id).first()
+    if strategy is None:
+        raise HTTPException(status_code=404, detail=f"Strategy {strategy_id} not found.")
+    runs = (
+        db.query(WorkflowRun)
+        .filter(WorkflowRun.strategy_id == strategy_id)
+        .count()
+    )
+    if runs:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This strategy has {runs} workflow run(s). Archive it instead; deleting it would remove their drafts and publications.",
+        )
+    ideas = db.query(Idea).filter(Idea.strategy_id == strategy_id).count()
+    db.delete(strategy)
+    db.commit()
+    return {"deleted_strategy_id": str(strategy_id), "deleted_ideas": ideas}

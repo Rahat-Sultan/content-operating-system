@@ -1,3 +1,4 @@
+from pydantic import BaseModel, Field
 from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -115,6 +116,23 @@ def submit_approval_decision(
         decision=approval.status,
         feedback=approval.feedback,
     )
+
+
+class DraftEditRequest(BaseModel):
+    title: str | None = Field(default=None, max_length=300)
+    body: str = Field(min_length=1, max_length=20000)
+
+
+@router.post("/{id}/draft/versions", status_code=201)
+def save_draft_edit(id: UUID, request: DraftEditRequest, db: Session = Depends(get_db)):
+    """Saves a human edit as a new version. Only while the run is NEEDS_REVIEW."""
+    from app.workflows.service import create_human_edit_version
+    version = create_human_edit_version(db, id, request.title, request.body)
+    return {
+        "content_version_id": str(version.id),
+        "version_number": version.version_number,
+        "origin": version.origin.value,
+    }
 
 
 @router.get("/{id}/research", response_model=ResearchResponse)

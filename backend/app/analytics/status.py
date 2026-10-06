@@ -78,6 +78,7 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def build_analytics_status(db: Session, publication: Publication) -> dict[str, Any]:
+    from app.analytics.upstream import deleted_upstream_at
     schedule = get_publication_sync_schedule_info(db, publication)
     valid = _latest_valid_snapshot(db, publication.id)
     manual = (publication.publication_metadata or {}).get(MANUAL_SYNC_KEY)
@@ -109,7 +110,10 @@ def build_analytics_status(db: Session, publication: Publication) -> dict[str, A
         and (last_attempt is None or valid.collected_at > _parse_iso(last_attempt["at"]))
     )
 
-    if manual_snapshot_newer:
+    deleted_at = deleted_upstream_at(publication)
+    if deleted_at:
+        state = "deleted_upstream"
+    elif manual_snapshot_newer:
         state = "manual"
     elif last_attempt is None:
         state = "available" if valid else "none"
@@ -138,6 +142,7 @@ def build_analytics_status(db: Session, publication: Publication) -> dict[str, A
         "next_sync_at": schedule["next_sync_at"],
         "next_sync_overdue": schedule["next_sync_overdue"],
         "scheduler_running": schedule["scheduler_running"],
+        "deleted_upstream_at": deleted_at,
         "valid_snapshot": {
             "id": str(valid.id),
             "collected_at": valid.collected_at.isoformat(),
