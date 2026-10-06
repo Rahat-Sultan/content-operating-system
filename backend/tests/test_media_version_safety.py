@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from tests.test_publishing_concurrency import test_owner_id
 from uuid import uuid4
 from datetime import datetime
@@ -21,6 +22,10 @@ from app.strategies.models import ContentStrategy
 
 class TestMediaAssetVersionSafety(unittest.TestCase):
     def setUp(self):
+        # These tests check version isolation, not where files are stored: keep local storage.
+        patcher = patch("app.media.supabase_storage.configured", return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.db = SessionLocal()
         # Create test strategy, idea, workflow_run, and content
         self.strategy = ContentStrategy(

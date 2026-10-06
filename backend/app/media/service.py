@@ -94,7 +94,6 @@ def generate_media_for_content_version(
     #    otherwise the local media folder. The per-account limit applies to both.
     from app.media import supabase_storage
     from app.workflows.models import WorkflowRun
-    from app.content.models import Content
     owner_id = (db.query(WorkflowRun.owner_id).join(Content, Content.workflow_run_id == WorkflowRun.id)
                 .filter(Content.id == content.id).scalar())
     supabase_storage.check_quota(db, owner_id, len(gen_result.data))
