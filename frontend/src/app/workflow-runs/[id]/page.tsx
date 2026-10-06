@@ -13,6 +13,7 @@ import {
   fetchWorkflowRunPublication,
   fetchPublicationAnalytics,
   syncPublicationAnalytics,
+  submitManualMetrics,
   fetchVersionMedia,
   generateVersionMedia,
 } from "@/lib/api";
@@ -38,6 +39,18 @@ export default function WorkflowRunDetailPage({
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState("");
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  // Manual metrics modal / form state
+  const [showManualMetricsForm, setShowManualMetricsForm] = useState(false);
+  const [manualImpressions, setManualImpressions] = useState(0);
+  const [manualReactions, setManualReactions] = useState(0);
+  const [manualComments, setManualComments] = useState(0);
+  const [manualClicks, setManualClicks] = useState(0);
+  const [manualShares, setManualShares] = useState(0);
+  const [manualError, setManualError] = useState<string | null>(null);
 
   // 1. Workflow Run State
   const {
@@ -132,11 +145,35 @@ export default function WorkflowRunDetailPage({
     onSuccess: () => {
       setSyncError(null);
       refetchAnalytics();
+      refetchPublication();
     },
     onError: (err: any) => {
       setSyncError(err?.message || "Failed to sync metrics from provider.");
     },
   });
+
+  // Manual Metrics Mutation (CP-1.5)
+  const manualMetricsMutation = useMutation({
+    mutationFn: () => {
+      if (!publication?.id) throw new Error("No publication found to record manual metrics for.");
+      return submitManualMetrics(publication.id, {
+        impressions: Number(manualImpressions) || 0,
+        reactions: Number(manualReactions) || 0,
+        comments: Number(manualComments) || 0,
+        clicks: Number(manualClicks) || 0,
+        shares: Number(manualShares) || 0,
+      });
+    },
+    onSuccess: () => {
+      setManualError(null);
+      setShowManualMetricsForm(false);
+      refetchAnalytics();
+    },
+    onError: (err: any) => {
+      setManualError(err?.message || "Failed to submit manual metrics.");
+    },
+  });
+
 
   // 8. Version Media Assets
   const currentVersionId = draft?.current_version?.id;
@@ -250,29 +287,64 @@ export default function WorkflowRunDetailPage({
           </Link>
         </div>
         <div className="flex items-center space-x-3">
+          {lastRefreshedAt && (
+            <span
+              data-testid="refresh-updated-at"
+              className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded"
+            >
+              Updated {lastRefreshedAt}
+            </span>
+          )}
+          {refreshError && (
+            <span className="text-[11px] text-rose-400">
+              {refreshError}
+            </span>
+          )}
           <button
             onClick={async () => {
-              await Promise.all([
-                refetch(),
-                refetchDraft(),
-                refetchResearch(),
-                refetchBrief(),
-                refetchPublication(),
-                refetchAnalytics(),
-                refetchMedia(),
-                queryClient.invalidateQueries({ queryKey: ["workflow-run", id] }),
-                queryClient.invalidateQueries({ queryKey: ["workflow-run-draft", id] }),
-                queryClient.invalidateQueries({ queryKey: ["workflow-run-research", id] }),
-                queryClient.invalidateQueries({ queryKey: ["workflow-run-brief", id] }),
-                queryClient.invalidateQueries({ queryKey: ["workflow-run-publication", id] }),
-                queryClient.invalidateQueries({ queryKey: ["publication-analytics"] }),
-                queryClient.invalidateQueries({ queryKey: ["version-media"] }),
-              ]);
+              try {
+                setIsRefreshing(true);
+                setRefreshError(null);
+                await Promise.all([
+                  refetch(),
+                  refetchDraft(),
+                  refetchResearch(),
+                  refetchBrief(),
+                  refetchPublication(),
+                  refetchAnalytics(),
+                  refetchMedia(),
+                  queryClient.invalidateQueries({ queryKey: ["workflow-run", id] }),
+                  queryClient.invalidateQueries({ queryKey: ["workflow-run-draft", id] }),
+                  queryClient.invalidateQueries({ queryKey: ["workflow-run-research", id] }),
+                  queryClient.invalidateQueries({ queryKey: ["workflow-run-brief", id] }),
+                  queryClient.invalidateQueries({ queryKey: ["workflow-run-publication", id] }),
+                  queryClient.invalidateQueries({ queryKey: ["publication-analytics"] }),
+                  queryClient.invalidateQueries({ queryKey: ["version-media"] }),
+                ]);
+                const now = new Date();
+                const timeStr = now.toTimeString().split(" ")[0]; // HH:MM:SS
+                setLastRefreshedAt(timeStr);
+              } catch (err: any) {
+                setRefreshError("Refresh failed: " + (err?.message || "network error"));
+              } finally {
+                setIsRefreshing(false);
+              }
             }}
-            className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center space-x-1 transition active:scale-95"
+            disabled={isRefreshing}
+            data-testid="header-refresh-btn"
+            className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 border border-slate-700 flex items-center space-x-1.5 transition active:scale-95"
           >
-            <span>↻</span>
-            <span>Refresh</span>
+            {isRefreshing ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Refreshing…</span>
+              </>
+            ) : (
+              <>
+                <span>↻</span>
+                <span>Refresh</span>
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -523,82 +595,204 @@ export default function WorkflowRunDetailPage({
 
                   {/* Latest Metrics Summary Cards */}
                   {(() => {
-                    const latestSnapshot = analyticsSnapshots && analyticsSnapshots.length > 0 
-                      ? analyticsSnapshots[0] 
-                      : null;
-                    const metrics = latestSnapshot?.metrics || {};
+                    // CP-1.3: Ignore quarantined rows and stub rows for headline metrics
+                    const validSnapshots = (analyticsSnapshots || []).filter(
+                      (snap) => !snap.metrics.is_stub && !snap.metrics.invalid_reason
+                    );
+                    const latestValidSnapshot = validSnapshots.length > 0 ? validSnapshots[0] : null;
+                    const metrics = latestValidSnapshot?.metrics || null;
+
+                    // Determine state for CP-1.4:
+                    // 1. Available: latestValidSnapshot exists
+                    // 2. Not Yet Available (Amber): no valid snapshot, but scheduler has future retry or attempt < 6
+                    // 3. Not Available / Unsupported: syncError says unsupported or attempts exhausted or channel not providing metrics
+                    const hasValidMetrics = !!latestValidSnapshot;
+                    const isUnsupported = syncError?.toLowerCase().includes("unsupported") || 
+                      syncError?.toLowerCase().includes("not available from buffer") ||
+                      publication.schedule_info?.sync_attempt_count === 6 && !hasValidMetrics;
+                    const nextSyncAt = publication.schedule_info?.next_sync_at;
 
                     return (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Impressions
-                            </span>
-                            <span className="text-lg font-bold text-slate-100 font-mono">
-                              {metrics.impressions ?? 0}
-                            </span>
+                      <div className="space-y-4">
+                        {/* State 1: Metrics Available */}
+                        {hasValidMetrics && metrics ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                                  Impressions
+                                </span>
+                                <span className="text-lg font-bold text-slate-100 font-mono">
+                                  {metrics.impressions ?? 0}
+                                </span>
+                              </div>
+                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                                  Clicks
+                                </span>
+                                <span className="text-lg font-bold text-slate-100 font-mono">
+                                  {metrics.clicks ?? 0}
+                                </span>
+                              </div>
+                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                                  Likes / Reactions
+                                </span>
+                                <span className="text-lg font-bold text-slate-100 font-mono">
+                                  {metrics.likes ?? metrics.reactions ?? 0}
+                                </span>
+                              </div>
+                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                                  Comments
+                                </span>
+                                <span className="text-lg font-bold text-slate-100 font-mono">
+                                  {metrics.comments ?? 0}
+                                </span>
+                              </div>
+                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                                  Shares
+                                </span>
+                                <span className="text-lg font-bold text-slate-100 font-mono">
+                                  {metrics.shares ?? 0}
+                                </span>
+                              </div>
+                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
+                                  Last Synced
+                                </span>
+                                <span className="text-[11px] font-medium text-slate-300 block truncate" data-testid="analytics-last-synced" title={latestValidSnapshot.collected_at}>
+                                  {new Date(latestValidSnapshot.collected_at).toLocaleTimeString()}
+                                </span>
+                                <span className="text-[9px] text-slate-400 block capitalize">
+                                  {metrics.provider === "manual" ? "Manual Entry" : metrics.provider || "Buffer"}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Clicks
-                            </span>
-                            <span className="text-lg font-bold text-slate-100 font-mono">
-                              {metrics.clicks ?? 0}
-                            </span>
+                        ) : isUnsupported ? (
+                          /* State 3: Not available from Buffer for this channel type */
+                          <div
+                            data-testid="analytics-unsupported-state"
+                            className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-300 space-y-2"
+                          >
+                            <div className="flex items-center space-x-2 text-slate-300 text-xs font-semibold">
+                              <span className="text-base">ℹ️</span>
+                              <span>Buffer isn't providing metrics for this post. Check LinkedIn directly.</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400">
+                              Personal LinkedIn profiles require downstream batch metric ingestion or manual entry.
+                            </p>
                           </div>
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Likes / Reactions
-                            </span>
-                            <span className="text-lg font-bold text-slate-100 font-mono">
-                              {metrics.likes ?? metrics.reactions ?? 0}
-                            </span>
+                        ) : (
+                          /* State 2: Not Yet Available (Amber) with retry time */
+                          <div
+                            data-testid="analytics-not-yet-available"
+                            className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/80 text-amber-200 space-y-2"
+                          >
+                            <div className="flex items-center space-x-2 text-xs font-semibold text-amber-300">
+                              <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                              <span>Metrics Not Yet Available</span>
+                            </div>
+                            <p className="text-xs text-amber-200/90">
+                              Buffer has not yet updated live metrics for this post (awaiting source network collection).
+                            </p>
+                            <div className="text-[11px] text-amber-300/80 font-mono flex items-center space-x-3 pt-1">
+                              <span>
+                                Next scheduled sync: {nextSyncAt ? new Date(nextSyncAt).toLocaleTimeString() : "Pending"}
+                              </span>
+                              <span>•</span>
+                              <span>Attempt {publication.schedule_info?.sync_attempt_count ?? 0} of 6</span>
+                            </div>
                           </div>
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Comments
+                        )}
+
+                        {/* Manual Metrics Entry Bar / Form (CP-1.5) */}
+                        <div className="pt-2 border-t border-slate-800/60 flex flex-col space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-400">
+                              Have real metrics directly from LinkedIn?
                             </span>
-                            <span className="text-lg font-bold text-slate-100 font-mono">
-                              {metrics.comments ?? 0}
-                            </span>
+                            <button
+                              onClick={() => setShowManualMetricsForm(!showManualMetricsForm)}
+                              className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition underline"
+                            >
+                              {showManualMetricsForm ? "Cancel manual entry" : "Enter metrics from LinkedIn"}
+                            </button>
                           </div>
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Shares
-                            </span>
-                            <span className="text-lg font-bold text-slate-100 font-mono">
-                              {metrics.shares ?? 0}
-                            </span>
-                          </div>
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Last Synced
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-300 block truncate" data-testid="analytics-last-synced" title={publication.schedule_info?.last_synced_at || latestSnapshot?.collected_at || "Never"}>
-                              {publication.schedule_info?.last_synced_at
-                                ? new Date(publication.schedule_info.last_synced_at).toLocaleTimeString()
-                                : latestSnapshot?.collected_at
-                                ? new Date(latestSnapshot.collected_at).toLocaleTimeString()
-                                : "Never"}
-                            </span>
-                            <span className="text-[9px] text-slate-500 block">
-                              {metrics.is_stub ? "Initial Stub" : metrics.provider || "Buffer"}
-                            </span>
-                          </div>
-                          <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                            <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                              Next Scheduled Sync
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-300 block truncate" data-testid="analytics-next-sync" title={publication.schedule_info?.next_sync_at || "Completed all steps"}>
-                              {publication.schedule_info?.next_sync_at
-                                ? new Date(publication.schedule_info.next_sync_at).toLocaleTimeString()
-                                : "Completed / None"}
-                            </span>
-                            <span className="text-[9px] text-slate-500 block">
-                              Attempt {publication.schedule_info?.sync_attempt_count ?? 0} of 6
-                            </span>
-                          </div>
+
+                          {showManualMetricsForm && (
+                            <div className="p-4 rounded-lg bg-slate-950/80 border border-slate-800 space-y-3">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                Record Manual Snapshot from LinkedIn
+                              </h4>
+                              {manualError && (
+                                <p className="text-xs text-rose-400">{manualError}</p>
+                              )}
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                                <div>
+                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Impressions</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={manualImpressions}
+                                    onChange={(e) => setManualImpressions(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Reactions</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={manualReactions}
+                                    onChange={(e) => setManualReactions(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Comments</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={manualComments}
+                                    onChange={(e) => setManualComments(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Clicks</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={manualClicks}
+                                    onChange={(e) => setManualClicks(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] text-slate-400 uppercase block mb-1">Shares</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={manualShares}
+                                    onChange={(e) => setManualShares(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-xs"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex justify-end pt-1">
+                                <button
+                                  onClick={() => manualMetricsMutation.mutate()}
+                                  disabled={manualMetricsMutation.isPending}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold shadow transition"
+                                >
+                                  {manualMetricsMutation.isPending ? "Saving..." : "Save Manual Snapshot"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Historical Snapshots Table */}
@@ -627,42 +821,60 @@ export default function WorkflowRunDetailPage({
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
-                                  {analyticsSnapshots.map((snap) => (
-                                    <tr key={snap.id} className="hover:bg-slate-900/40">
-                                      <td className="py-2 px-3 text-slate-300 whitespace-nowrap">
-                                        {new Date(snap.collected_at).toLocaleString()}
-                                      </td>
-                                      <td className="py-2 px-3 text-slate-400">
-                                        {snap.metrics.is_stub ? (
-                                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950/60 text-amber-400 border border-amber-800/60">stub</span>
-                                        ) : (
-                                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950/60 text-indigo-300 border border-indigo-800/60">
-                                            {snap.metrics.provider || "buffer"}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="py-2 px-3 text-right text-slate-200">
-                                        {snap.metrics.impressions ?? 0}
-                                      </td>
-                                      <td className="py-2 px-3 text-right text-slate-200">
-                                        {snap.metrics.clicks ?? 0}
-                                      </td>
-                                      <td className="py-2 px-3 text-right text-slate-200">
-                                        {snap.metrics.likes ?? snap.metrics.reactions ?? 0}
-                                      </td>
-                                      <td className="py-2 px-3 text-right text-slate-200">
-                                        {snap.metrics.comments ?? 0}
-                                      </td>
-                                      <td className="py-2 px-3 text-right text-slate-200">
-                                        {snap.metrics.shares ?? 0}
-                                      </td>
-                                      <td className="py-2 px-3 text-center">
-                                        <span className="text-[10px] text-slate-400">
-                                          {snap.metrics.post_status || "synced"}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
+                                  {analyticsSnapshots.map((snap) => {
+                                    const isQuarantined = !!snap.metrics.invalid_reason;
+                                    const isStub = !!snap.metrics.is_stub;
+                                    return (
+                                      <tr key={snap.id} className="hover:bg-slate-900/40">
+                                        <td className="py-2 px-3 text-slate-300 whitespace-nowrap">
+                                          {new Date(snap.collected_at).toLocaleString()}
+                                        </td>
+                                        <td className="py-2 px-3 text-slate-400">
+                                          {isStub ? (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950/60 text-amber-400 border border-amber-800/60">stub</span>
+                                          ) : snap.metrics.provider === "manual" ? (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
+                                              manual
+                                            </span>
+                                          ) : (
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950/60 text-indigo-300 border border-indigo-800/60">
+                                              {snap.metrics.provider || "buffer"}
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-slate-200">
+                                          {snap.metrics.impressions ?? 0}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-slate-200">
+                                          {snap.metrics.clicks ?? 0}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-slate-200">
+                                          {snap.metrics.likes ?? snap.metrics.reactions ?? 0}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-slate-200">
+                                          {snap.metrics.comments ?? 0}
+                                        </td>
+                                        <td className="py-2 px-3 text-right text-slate-200">
+                                          {snap.metrics.shares ?? 0}
+                                        </td>
+                                        <td className="py-2 px-3 text-center">
+                                          {isQuarantined ? (
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] bg-rose-950/70 text-rose-300 border border-rose-800" title={snap.metrics.invalid_reason}>
+                                              quarantined
+                                            </span>
+                                          ) : isStub ? (
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] bg-amber-950/70 text-amber-400 border border-amber-800">
+                                              stub
+                                            </span>
+                                          ) : (
+                                            <span className="text-[10px] text-slate-400">
+                                              {snap.metrics.post_status || "synced"}
+                                            </span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -671,6 +883,7 @@ export default function WorkflowRunDetailPage({
                       </div>
                     );
                   })()}
+
                 </div>
               )}
             </div>
@@ -714,6 +927,48 @@ export default function WorkflowRunDetailPage({
 
               <div className="text-xs leading-relaxed text-slate-300 font-mono whitespace-pre-wrap">
                 {draft.current_version.body}
+              </div>
+
+              {/* LinkedIn Plain Text Preview Panel (CP-3.3) */}
+              <div className="mt-4 pt-4 border-t border-slate-800 space-y-3" data-testid="linkedin-preview-panel">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                      LinkedIn Preview (Plain Text)
+                    </span>
+                    <span className="text-[10px] bg-indigo-950/70 border border-indigo-800 text-indigo-300 px-1.5 py-0.5 rounded">
+                      Publish Payload
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-xs font-mono">
+                    <span
+                      data-testid="linkedin-char-counter"
+                      className={`font-semibold ${
+                        (draft.current_version.char_count ?? draft.linkedin_preview?.length ?? 0) > 3000
+                          ? "text-rose-400"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {(draft.current_version.char_count ?? draft.linkedin_preview?.length ?? 0).toLocaleString()} / 3,000 chars
+                    </span>
+                  </div>
+                </div>
+
+                {draft.current_version.will_truncate && (
+                  <div className="p-2.5 rounded-lg bg-amber-950/50 border border-amber-800 text-amber-300 text-xs flex items-center space-x-2">
+                    <span>⚠️</span>
+                    <span>
+                      Draft exceeds LinkedIn platform limit (3,000 characters) and will be cleanly truncated at sentence boundary upon publishing.
+                    </span>
+                  </div>
+                )}
+
+                <div
+                  data-testid="linkedin-preview-text"
+                  className="p-4 rounded-lg bg-slate-950/80 border border-slate-800/80 text-xs text-slate-200 font-sans whitespace-pre-wrap leading-relaxed selection:bg-indigo-900"
+                >
+                  {draft.current_version.linkedin_preview || draft.linkedin_preview || draft.current_version.body}
+                </div>
               </div>
             </div>
 

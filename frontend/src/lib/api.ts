@@ -66,6 +66,9 @@ export interface ContentVersionSummary {
   title?: string | null;
   body: string;
   lint_warnings?: DraftLintWarning[];
+  linkedin_preview?: string;
+  char_count?: number;
+  will_truncate?: boolean;
   created_at: string;
 }
 
@@ -75,6 +78,9 @@ export interface ContentDraftResponse {
   current_version: ContentVersionSummary;
   versions: ContentVersionSummary[];
   lint_warnings?: DraftLintWarning[];
+  linkedin_preview?: string;
+  char_count?: number;
+  will_truncate?: boolean;
 }
 
 export interface ApprovalDecisionResponse {
@@ -460,6 +466,31 @@ export async function syncPublicationAnalytics(publicationId: string): Promise<A
   }
   return data;
 }
+
+export interface ManualMetricsInputPayload {
+  impressions: number;
+  reactions: number;
+  comments: number;
+  clicks: number;
+  shares: number;
+}
+
+export async function submitManualMetrics(
+  publicationId: string,
+  payload: ManualMetricsInputPayload
+): Promise<AnalyticsSnapshot> {
+  const res = await fetch(`${API_BASE}/publications/${publicationId}/analytics/manual`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to submit manual metrics");
+  }
+  return data;
+}
+
 
 export interface MediaAsset {
   id: string;

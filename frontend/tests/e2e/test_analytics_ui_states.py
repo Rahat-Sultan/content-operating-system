@@ -45,7 +45,7 @@ def test_analytics_ui_states():
         time.sleep(1)
         page.wait_for_load_state("networkidle")
 
-        amber_banner = page.locator("text=Metrics not yet available")
+        amber_banner = page.locator("text=Metrics not yet available").first
         assert amber_banner.is_visible(), "Amber 'not yet available' banner not visible!"
 
         state2_screenshot = "frontend/tests/e2e/analytics_state2_not_ready.png"
