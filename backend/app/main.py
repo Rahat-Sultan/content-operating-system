@@ -12,6 +12,7 @@ from app.publishing.routes import router as publications_router
 from app.strategies.routes import router as strategies_router
 from app.media.routes import router as media_router
 from app.llm.openrouter_client import check_api_key_configuration
+from app.health.network import check_network
 
 
 @asynccontextmanager
@@ -54,3 +55,8 @@ def health():
 def health_db(db: Session = Depends(get_db)):
     result = db.execute(text("SELECT 1")).scalar_one()
     return {"status": "ok", "db_result": result}
+
+
+@app.get("/health/network")
+def health_network():
+    return check_network()
