@@ -11,6 +11,81 @@ from app.media.interface import (
 )
 
 
+BOLD_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+REGULAR_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+def _font(path: str, size: int) -> ImageFont.ImageFont:
+    try:
+        return ImageFont.truetype(path, size)
+    except OSError:
+        return ImageFont.load_default(size)
+
+
+def _wrap(draw: ImageDraw.ImageDraw, text: str, font, max_width: int) -> list[str]:
+    lines: list[str] = []
+    line = ""
+    for word in text.split():
+        candidate = f"{line} {word}".strip()
+        if draw.textlength(candidate, font=font) <= max_width:
+            line = candidate
+        else:
+            if line:
+                lines.append(line)
+            line = word
+    if line:
+        lines.append(line)
+    return lines
+
+
+def _render_card(title: str, subtitle: str, w: int, h: int) -> Image.Image:
+    """
+    A post card: gradient background, the headline set large, a topic line and a brand footer.
+    Readable on a phone, no debug text.
+    """
+    image = Image.new("RGB", (w, h))
+    top, bottom = (76, 29, 149), (14, 116, 144)  # violet to teal, dark enough for white text
+    px = image.load()
+    for y in range(h):
+        t = y / max(1, h - 1)
+        color = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3))
+        for x in range(w):
+            px[x, y] = color
+    draw = ImageDraw.Draw(image, "RGBA")
+
+    # Headline: shrink until it fits in the card.
+    margin = 80
+    max_width = w - 2 * margin
+    headline_size = 84
+    while True:
+        font = _font(BOLD_FONT, headline_size)
+        lines = _wrap(draw, title, font, max_width)
+        line_height = int(headline_size * 1.18)
+        if len(lines) * line_height <= h * 0.50 or headline_size <= 40:
+            break
+        headline_size -= 4
+    y = margin + 40
+    for line in lines[:6]:
+        draw.text((margin, y), line, font=font, fill=(255, 255, 255, 255))
+        y += line_height
+
+    if subtitle:
+        sub_font = _font(REGULAR_FONT, 34)
+        sub_lines = _wrap(draw, subtitle, sub_font, max_width)
+        draw.text((margin, y + 18), sub_lines[0] if sub_lines else subtitle, font=sub_font, fill=(255, 255, 255, 215))
+
+    # Brand footer: the three bars of the logo, the name, and a thin rule.
+    footer_y = h - 110
+    draw.line([(margin, footer_y), (w - margin, footer_y)], fill=(255, 255, 255, 60), width=2)
+    bx = margin
+    for height, alpha in ((26, 140), (40, 200), (54, 255)):
+        draw.rounded_rectangle([bx, footer_y + 40 + (54 - height), bx + 14, footer_y + 40 + 54],
+                               radius=4, fill=(255, 255, 255, alpha))
+        bx += 22
+    draw.text((bx + 16, footer_y + 40), "Content OS", font=_font(BOLD_FONT, 30), fill=(255, 255, 255, 255))
+    return image.convert("RGB")
+
+
 class LocalTestImageGenerationProvider(ImageGenerationProvider):
     """
     Local test provider for image generation.
@@ -30,50 +105,16 @@ class LocalTestImageGenerationProvider(ImageGenerationProvider):
         if self.simulate_transient_failure:
             raise TransientImageGenerationError("Simulated transient image generation error (503 / timeout).")
 
-        # Create an aesthetically modern banner (dark slate palette matching Content OS)
         w, h = request.width, request.height
-        image = Image.new("RGB", (w, h), color=(15, 23, 42))  # slate-900
-        draw = ImageDraw.Draw(image)
-
-        # Draw decorative background gradients / geometric grid lines
-        for x in range(0, w, 60):
-            draw.line([(x, 0), (x, h)], fill=(30, 41, 59), width=1)  # slate-800
-        for y in range(0, h, 60):
-            draw.line([(0, y), (w, y)], fill=(30, 41, 59), width=1)
-
-        # Draw decorative accent badge border
-        accent_color = (99, 102, 241)  # indigo-500
-        draw.rectangle([40, 40, w - 40, h - 40], outline=accent_color, width=2)
-
-        # Header tag
-        draw.rectangle([60, 60, 260, 96], fill=(30, 27, 75))  # indigo-950
-        draw.text((75, 70), "CONTENT OS • MEDIA", fill=(165, 180, 252))  # indigo-300
-
-        # Topic / title text
-        display_title = request.title or "Generated Media Asset"
-        if len(display_title) > 65:
-            display_title = display_title[:62] + "..."
-
-        draw.text((60, 140), display_title, fill=(248, 250, 252))  # slate-50
-
-        # Prompt excerpt
-        prompt_snippet = request.prompt
-        if len(prompt_snippet) > 140:
-            prompt_snippet = prompt_snippet[:137] + "..."
-        draw.text((60, 200), f"Prompt: {prompt_snippet}", fill=(148, 163, 184))  # slate-400
-
-        # Version stamp
-        draw.text((60, h - 80), f"Version ID: {str(request.content_version_id)}", fill=(100, 116, 139))  # slate-500
-
-        # Provider tag in bottom right
-        draw.text((w - 240, h - 80), "PROVIDER: LOCAL_TEST", fill=(251, 191, 36))  # amber-400
+        title = (request.title or request.topic or "Content OS").strip()
+        image = _render_card(title, (request.topic or "").strip(), w, h)
 
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
         raw_bytes = buffer.getvalue()
 
         asset_id = f"local_{uuid4().hex[:12]}"
-        alt_text = f"Banner image representing: {display_title}"
+        alt_text = f"Post image: {title}"
 
         return ImageGenerationResult(
             provider="local_test",
