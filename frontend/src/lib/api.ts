@@ -249,7 +249,8 @@ export interface PublicationResponse {
 
 /** One status per publication, derived by the backend from the most recent attempt. */
 export interface AnalyticsStatus {
-  state: "available" | "manual" | "not_collected_yet" | "network_error" | "failed" | "none";
+  state: "available" | "manual" | "not_collected_yet" | "network_error" | "failed" | "none" | "deleted_upstream";
+  deleted_upstream_at?: string | null;
   last_attempt_at: string | null;
   last_attempt_outcome: string | null;
   last_attempt_source: "scheduler" | "manual" | null;
@@ -285,6 +286,7 @@ export interface StrategyItem {
   id: string;
   name: string;
   description?: string | null;
+  archived_at?: string | null;
   config: {
     niche?: string;
     audience?: string;
@@ -348,8 +350,11 @@ export interface SourceOption {
   config?: Record<string, any>;
 }
 
-export async function fetchStrategies(enabledOnly = false): Promise<StrategyItem[]> {
-  const url = `${API_BASE}/strategies${enabledOnly ? "?enabled_only=true" : ""}`;
+export async function fetchStrategies(enabledOnly = false, archived?: boolean): Promise<StrategyItem[]> {
+  const params = new URLSearchParams();
+  if (enabledOnly) params.set("enabled_only", "true");
+  if (archived !== undefined) params.set("archived", String(archived));
+  const url = `${API_BASE}/strategies${params.toString() ? `?${params.toString()}` : ""}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch strategies: ${res.statusText}`);
@@ -616,5 +621,61 @@ export async function fetchAnalyticsSummary(includeTest = false, platform?: stri
   if (platform) qs.set("platform", platform);
   const res = await fetch(`${API_BASE}/analytics/summary?${qs.toString()}`);
   if (!res.ok) throw new Error(`Failed to load analytics summary: ${res.statusText}`);
+  return res.json();
+}
+
+/** Error text from a failed response: the backend's detail string, or detail.message. */
+async function errorFrom(res: Response, fallback: string): Promise<Error> {
+  try {
+    const body = await res.json();
+    const d = body?.detail;
+    const message = typeof d === "string" ? d : d?.message ?? d?.detail ?? fallback;
+    return new Error(String(message));
+  } catch {
+    return new Error(fallback);
+  }
+}
+
+export async function saveDraftEdit(runId: string, edit: { title: string | null; body: string }) {
+  const res = await fetch(`${API_BASE}/workflow-runs/${runId}/draft/versions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(edit),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not save the edit.");
+  return res.json();
+}
+
+export async function archiveIdea(id: string) {
+  const res = await fetch(`${API_BASE}/ideas/${id}/archive`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not archive the idea.");
+  return res.json();
+}
+
+export async function restoreIdea(id: string) {
+  const res = await fetch(`${API_BASE}/ideas/${id}/restore`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not restore the idea.");
+  return res.json();
+}
+
+export async function deleteIdea(id: string) {
+  const res = await fetch(`${API_BASE}/ideas/${id}`, { method: "DELETE" });
+  if (!res.ok) throw await errorFrom(res, "Could not delete the idea.");
+  return res.json();
+}
+
+export async function archiveStrategy(id: string) {
+  const res = await fetch(`${API_BASE}/strategies/${id}/archive`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not archive the strategy.");
+}
+
+export async function restoreStrategy(id: string) {
+  const res = await fetch(`${API_BASE}/strategies/${id}/restore`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not restore the strategy.");
+}
+
+export async function deleteStrategy(id: string) {
+  const res = await fetch(`${API_BASE}/strategies/${id}`, { method: "DELETE" });
+  if (!res.ok) throw await errorFrom(res, "Could not delete the strategy.");
   return res.json();
 }

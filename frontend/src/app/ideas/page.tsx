@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PlatformBadge } from "@/components/PlatformBadge";
-import { fetchIdeas, IdeaItem } from "@/lib/api";
+import { archiveIdea, deleteIdea, fetchIdeas, IdeaItem, restoreIdea } from "@/lib/api";
 
 const STATUS_FILTERS = [
   "ALL",
@@ -26,18 +26,45 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
 };
 
 export default function IdeasPage() {
+  const [view, setView] = useState<"active" | "archive">("active");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
+  const [rowError, setRowError] = useState<Record<string, string>>({});
+  const queryClient = useQueryClient();
 
+  // Archived ideas (status REJECTED) live in their own view. Active view never shows them.
+  const queryStatus = view === "archive" ? "REJECTED" : selectedStatus;
   const {
-    data: ideas,
+    data: fetched,
     isLoading,
     isError,
     error,
     refetch,
   } = useQuery({
-    queryKey: ["ideas", selectedStatus],
-    queryFn: () => fetchIdeas(selectedStatus),
+    queryKey: ["ideas", queryStatus],
+    queryFn: () => fetchIdeas(queryStatus),
   });
+  const ideas = fetched?.filter((i) => (view === "archive" ? i.status === "REJECTED" : i.status !== "REJECTED"));
+
+  const act = useMutation({
+    mutationFn: async ({ id, kind }: { id: string; kind: "archive" | "restore" | "delete" }) => {
+      if (kind === "archive") return archiveIdea(id);
+      if (kind === "restore") return restoreIdea(id);
+      return deleteIdea(id);
+    },
+    onSuccess: (_, v) => {
+      setRowError((e) => ({ ...e, [v.id]: "" }));
+      queryClient.invalidateQueries({ queryKey: ["ideas"] });
+    },
+    onError: (err: any, v) => {
+      setRowError((e) => ({ ...e, [v.id]: err?.message || "Action failed." }));
+    },
+  });
+
+  function confirmDelete(idea: IdeaItem) {
+    if (window.confirm(`Delete "${idea.title}" permanently? This cannot be undone.`)) {
+      act.mutate({ id: idea.id, kind: "delete" });
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -97,12 +124,38 @@ export default function IdeasPage() {
           </button>
         </div>
 
+        {/* Active ideas or the Rejected archive */}
+        <div role="tablist" className="flex items-center gap-2 pt-5">
+          {(["active", "archive"] as const).map((v) => (
+            <button
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              data-testid={`ideas-view-${v}`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                view === v
+                  ? "bg-indigo-600 border-indigo-500 text-white"
+                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {v === "active" ? "Active" : "Rejected (archive)"}
+            </button>
+          ))}
+          {view === "archive" && (
+            <span className="text-[11px] text-slate-500 ml-2">
+              Archived ideas are kept, not deleted. Restore one to bring it back.
+            </span>
+          )}
+        </div>
+
         {/* Filter Pills */}
+        {view === "active" && (
         <div className="flex items-center gap-2 overflow-x-auto py-4 scrollbar-none">
           <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold mr-2">
             Status:
           </span>
-          {STATUS_FILTERS.map((status) => {
+          {STATUS_FILTERS.filter((x) => x !== "REJECTED").map((status) => {
             const isActive = selectedStatus === status;
             return (
               <button
@@ -119,6 +172,7 @@ export default function IdeasPage() {
             );
           })}
         </div>
+        )}
 
         {/* State: Loading */}
         {isLoading && (
@@ -151,7 +205,9 @@ export default function IdeasPage() {
           <div className="py-16 text-center border border-dashed border-slate-800 rounded-xl bg-slate-900/30 p-8 my-6">
             <p className="text-base font-medium text-slate-300">No ideas found</p>
             <p className="text-xs text-slate-500 mt-1">
-              {selectedStatus === "ALL"
+              {view === "archive"
+                ? "Nothing archived. Archived ideas appear here."
+                : selectedStatus === "ALL"
                 ? "No ideas have been captured yet."
                 : `No ideas matching status "${selectedStatus}".`}
             </p>
@@ -167,10 +223,10 @@ export default function IdeasPage() {
                 "bg-slate-800 text-slate-300 border-slate-700";
 
               return (
+                <div key={idea.id} className="rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-sm">
                 <Link
-                  key={idea.id}
                   href={`/ideas/${idea.id}`}
-                  className="group block p-5 rounded-xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition shadow-sm"
+                  className="group block p-5"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="space-y-1.5 flex-1 min-w-0">
@@ -214,6 +270,38 @@ export default function IdeasPage() {
                     </div>
                   </div>
                 </Link>
+                <div className="flex items-center justify-end gap-2 px-5 pb-4 -mt-2">
+                  {rowError[idea.id] && (
+                    <span className="mr-auto text-[11px] text-rose-400">{rowError[idea.id]}</span>
+                  )}
+                  {view === "active" ? (
+                    <button
+                      onClick={() => act.mutate({ id: idea.id, kind: "archive" })}
+                      disabled={act.isPending}
+                      className="px-3 py-1 rounded-md text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      Archive
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => act.mutate({ id: idea.id, kind: "restore" })}
+                        disabled={act.isPending}
+                        className="px-3 py-1 rounded-md text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        onClick={() => confirmDelete(idea)}
+                        disabled={act.isPending}
+                        className="px-3 py-1 rounded-md text-xs border border-rose-800 text-rose-300 hover:bg-rose-950/50 disabled:opacity-50"
+                      >
+                        Delete permanently
+                      </button>
+                    </>
+                  )}
+                </div>
+                </div>
               );
             })}
           </div>

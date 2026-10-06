@@ -5,6 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   fetchStrategies,
+  archiveStrategy,
+  restoreStrategy,
+  deleteStrategy,
   createStrategy,
   fetchSources,
   StrategyItem,
@@ -44,6 +47,7 @@ export default function StrategiesPage() {
 
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [view, setView] = useState<"active" | "archive">("active");
   const {
     data: strategies,
     isLoading,
@@ -51,9 +55,32 @@ export default function StrategiesPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["strategies"],
-    queryFn: () => fetchStrategies(false),
+    queryKey: ["strategies", view],
+    queryFn: () => fetchStrategies(false, view === "archive"),
   });
+
+  const [rowError, setRowError] = useState<Record<string, string>>({});
+  const act = useMutation({
+    mutationFn: async ({ id, kind }: { id: string; kind: "archive" | "restore" | "delete" }) => {
+      if (kind === "archive") return archiveStrategy(id);
+      if (kind === "restore") return restoreStrategy(id);
+      return deleteStrategy(id);
+    },
+    onSuccess: (_, v) => {
+      setRowError((e) => ({ ...e, [v.id]: "" }));
+      queryClient.invalidateQueries({ queryKey: ["strategies"] });
+      queryClient.invalidateQueries({ queryKey: ["ideas"] });
+    },
+    onError: (err: any, v) => {
+      setRowError((e) => ({ ...e, [v.id]: err?.message || "Action failed." }));
+    },
+  });
+
+  function confirmDelete(strategy: StrategyItem) {
+    if (window.confirm(`Delete the strategy "${strategy.name}" and its unrun ideas permanently? This cannot be undone.`)) {
+      act.mutate({ id: strategy.id, kind: "delete" });
+    }
+  }
 
   const { data: availableSources } = useQuery({
     queryKey: ["available-sources"],
@@ -191,6 +218,30 @@ export default function StrategiesPage() {
           </div>
         </div>
 
+        <div role="tablist" className="flex items-center gap-2 mt-5">
+          {(["active", "archive"] as const).map((v) => (
+            <button
+              key={v}
+              role="tab"
+              aria-selected={view === v}
+              onClick={() => setView(v)}
+              data-testid={`strategies-view-${v}`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                view === v
+                  ? "bg-indigo-600 border-indigo-500 text-white"
+                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {v === "active" ? "Active" : "Rejected (archive)"}
+            </button>
+          ))}
+          {view === "archive" && (
+            <span className="text-[11px] text-slate-500 ml-2">
+              Archived strategies are kept, not deleted. Restore one to bring it back.
+            </span>
+          )}
+        </div>
+
         {/* Loading / Error States */}
         {isLoading && (
           <div className="py-20 text-center text-slate-500 text-sm">
@@ -219,10 +270,10 @@ export default function StrategiesPage() {
                 const sourcesCount = strategy.sources?.length || 0;
 
                 return (
+                  <div key={strategy.id} className="rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 transition-all duration-200">
                   <Link
-                    key={strategy.id}
                     href={`/strategies/${strategy.id}`}
-                    className="group block p-5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 transition-all duration-200"
+                    className="group block p-5"
                   >
                     <div className="flex items-start justify-between">
                       <div>
@@ -283,6 +334,38 @@ export default function StrategiesPage() {
                       </div>
                     )}
                   </Link>
+                  <div className="flex items-center justify-end gap-2 px-5 pb-4 -mt-2">
+                    {rowError[strategy.id] && (
+                      <span className="mr-auto text-[11px] text-rose-400">{rowError[strategy.id]}</span>
+                    )}
+                    {view === "active" ? (
+                      <button
+                        onClick={() => act.mutate({ id: strategy.id, kind: "archive" })}
+                        disabled={act.isPending}
+                        className="px-3 py-1 rounded-md text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        Archive
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => act.mutate({ id: strategy.id, kind: "restore" })}
+                          disabled={act.isPending}
+                          className="px-3 py-1 rounded-md text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={() => confirmDelete(strategy)}
+                          disabled={act.isPending}
+                          className="px-3 py-1 rounded-md text-xs border border-rose-800 text-rose-300 hover:bg-rose-950/50 disabled:opacity-50"
+                        >
+                          Delete permanently
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  </div>
                 );
               })
             )}

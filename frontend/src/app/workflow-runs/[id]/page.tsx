@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
+  saveDraftEdit,
   fetchWorkflowRun,
   fetchIdea,
   fetchWorkflowRunResearch,
@@ -263,12 +264,35 @@ export default function WorkflowRunDetailPage({
 
   // Generate Media Mutation
   const [mediaError, setMediaError] = useState<string | null>(null);
+  // Human edit: saves a NEW version of the draft (old versions are never changed).
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [mediaPrompt, setMediaPrompt] = useState<string | null>(null);
+  const saveEditMutation = useMutation({
+    mutationFn: () => saveDraftEdit(id, { title: editTitle.trim() || null, body: editBody }),
+    onSuccess: () => {
+      setEditError(null);
+      setEditOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["workflow-run-draft", id] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-run", id] });
+    },
+    onError: (err: any) => setEditError(err?.message || "Could not save the edit."),
+  });
+  function openEditor() {
+    setEditTitle(draft?.current_version?.title ?? "");
+    setEditBody(draft?.current_version?.body ?? "");
+    setEditError(null);
+    setEditOpen(true);
+  }
+
   const generateMediaMutation = useMutation({
-    mutationFn: async ({ regenerate = false }: { regenerate?: boolean } = {}) => {
+    mutationFn: async ({ regenerate = false, prompt }: { regenerate?: boolean; prompt?: string } = {}) => {
       if (!contentId || !currentVersionId) {
         throw new Error("No draft content version loaded to generate media for.");
       }
-      return generateVersionMedia(contentId, currentVersionId, undefined, regenerate);
+      return generateVersionMedia(contentId, currentVersionId, prompt?.trim() || undefined, regenerate);
     },
     onSuccess: () => {
       setMediaError(null);
@@ -681,9 +705,10 @@ export default function WorkflowRunDetailPage({
                       : state === "not_collected_yet" ? "Buffer has no metrics for this post yet"
                       : state === "network_error" ? "Couldn't reach Buffer from this server"
                       : state === "failed" ? "Last sync failed"
+                      : state === "deleted_upstream" ? "Deleted on LinkedIn"
                       : "No metrics checked yet";
                     const tone =
-                      state === "network_error" || state === "failed"
+                      state === "network_error" || state === "failed" || state === "deleted_upstream"
                         ? "bg-rose-950/40 border-rose-800 text-rose-200"
                         : state === "available" || state === "manual"
                         ? "bg-slate-900/60 border-slate-800 text-slate-200"
@@ -695,6 +720,8 @@ export default function WorkflowRunDetailPage({
                         ? `This server could not reach Buffer (network error). Last successful contact: ${fmtDateTime(status?.last_buffer_response_at, "none")}.`
                         : state === "failed"
                         ? `Provider error: ${status?.last_attempt_message ?? "unknown"}`
+                        : state === "deleted_upstream"
+                        ? `The post was deleted on the platform (detected ${fmtDateTime(status?.deleted_upstream_at)}). Metrics no longer update.`
                         : null;
                     const collected =
                       latestValid && state === "manual" ? `Entered manually on ${fmtDateTime(latestValid.collected_at)}`
@@ -1019,6 +1046,60 @@ export default function WorkflowRunDetailPage({
               </div>
             </div>
 
+            {/* Human edit: a new version; the current one is never changed */}
+            {run.status === "NEEDS_REVIEW" && (
+              <div data-testid="draft-edit" className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3 shadow">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">Edit draft</h3>
+                    <p className="text-[11px] text-slate-500">Saves a new version. The version you are reviewing stays as it is.</p>
+                  </div>
+                  {!editOpen && (
+                    <button
+                      onClick={openEditor}
+                      className="px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-semibold"
+                    >
+                      Edit draft
+                    </button>
+                  )}
+                </div>
+                {editOpen && (
+                  <div className="space-y-3">
+                    <input
+                      aria-label="Title"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Title (optional)"
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-100"
+                    />
+                    <textarea
+                      aria-label="Body"
+                      rows={16}
+                      value={editBody}
+                      onChange={(e) => setEditBody(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-100 font-mono leading-relaxed"
+                    />
+                    {editError && <p className="text-xs text-rose-400">{editError}</p>}
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setEditOpen(false)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => saveEditMutation.mutate()}
+                        disabled={!editBody.trim() || saveEditMutation.isPending}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold"
+                      >
+                        {saveEditMutation.isPending ? "Saving…" : "Save as new version"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Media Section */}
             <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4 shadow">
               <div className="flex items-center justify-between">
@@ -1031,7 +1112,7 @@ export default function WorkflowRunDetailPage({
                   </p>
                 </div>
                 <button
-                  onClick={() => generateMediaMutation.mutate({ regenerate: !!(mediaAssets && mediaAssets.length > 0) })}
+                  onClick={() => generateMediaMutation.mutate({ regenerate: !!(mediaAssets && mediaAssets.length > 0), prompt: mediaPrompt ?? undefined })}
                   disabled={generateMediaMutation.isPending}
                   className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center space-x-1.5 shadow transition-colors"
                 >
@@ -1044,6 +1125,18 @@ export default function WorkflowRunDetailPage({
                     <span>{mediaAssets && mediaAssets.length > 0 ? "Regenerate Image" : "Generate Image"}</span>
                   )}
                 </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="media-prompt" className="text-[11px] text-slate-400 font-semibold">Image prompt</label>
+                <textarea
+                  id="media-prompt"
+                  rows={3}
+                  value={mediaPrompt ?? (mediaAssets?.[0]?.prompt ?? "")}
+                  onChange={(e) => setMediaPrompt(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-xs text-slate-100"
+                />
+                <p className="text-[11px] text-slate-500">Change the prompt, then generate. The result is saved as a new asset.</p>
               </div>
 
               {mediaError && (
