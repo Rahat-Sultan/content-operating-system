@@ -90,19 +90,33 @@ def generate_media_for_content_version(
             detail=f"Unexpected error during image generation: {str(e)}"
         )
 
-    # 6. Store binary payload via MediaStorage boundary
-    storage = get_media_storage()
-    try:
-        stored = storage.save(
-            filename=f"{version.id}.png",
-            data=gen_result.data,
-            mime_type=gen_result.mime_type,
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Storage boundary failure: {str(e)}"
-        )
+    # 6. Store the image. Supabase when configured (public, unguessable path, per-account folder);
+    #    otherwise the local media folder. The per-account limit applies to both.
+    from app.media import supabase_storage
+    from app.workflows.models import WorkflowRun
+    from app.content.models import Content
+    owner_id = (db.query(WorkflowRun.owner_id).join(Content, Content.workflow_run_id == WorkflowRun.id)
+                .filter(Content.id == content.id).scalar())
+    supabase_storage.check_quota(db, owner_id, len(gen_result.data))
+    if supabase_storage.configured():
+        public_url, size_bytes = supabase_storage.upload(owner_id, gen_result.data, gen_result.mime_type)
+        class _Stored:
+            storage_url = public_url
+        stored = _Stored()
+        stored.size_bytes = size_bytes
+    else:
+        storage = get_media_storage()
+        try:
+            stored = storage.save(
+                filename=f"{version.id}.png",
+                data=gen_result.data,
+                mime_type=gen_result.mime_type,
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Storage boundary failure: {str(e)}"
+            )
 
     # 7. Persist MediaAsset row
     media_asset = MediaAsset(

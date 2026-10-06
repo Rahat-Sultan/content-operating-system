@@ -29,6 +29,8 @@ def public_image_url_for_version(db: Session, content_version_id: UUID) -> str |
     if asset is None:
         return None
 
+    if asset.storage_url.startswith("https://"):
+        return asset.storage_url  # already a public Supabase URL
     base = (settings.media_public_base_url or "").strip().rstrip("/")
     if not base.startswith("https://"):
         raise PermanentPublishingError(

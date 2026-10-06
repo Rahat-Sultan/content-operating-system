@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
     frontend_url: str = "http://localhost:3000"
+    # Supabase Storage for post images. The secret key is server-only and never reaches the browser.
+    supabase_url: str = ""
+    supabase_secret_key: str = ""
+    supabase_bucket: str = "post-image"
+    user_storage_limit_mb: int = 50
 
 
 settings = Settings()
