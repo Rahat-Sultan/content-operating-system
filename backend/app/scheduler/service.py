@@ -18,12 +18,51 @@ from app.scheduler.schedule_calculator import (
     get_next_analytics_sync_time,
 )
 from app.strategies.service import run_strategy_discovery
-from app.analytics.service import sync_publication_metrics
+from app.analytics.service import sync_publication_metrics, NETWORK_ERROR_STATE
+from app.scheduler.heartbeat import write_heartbeat, scheduler_running
 
 logger = logging.getLogger("scheduler")
 
 # Stale claim lease timeout: 5 minutes
 STALE_CLAIM_TIMEOUT_MINUTES = 5
+
+# A network failure (we could not reach Buffer) is retried after this delay...
+NETWORK_RETRY_DELAY = timedelta(minutes=5)
+# ...and automatic retries pause after this many failures in a row (about one hour).
+# A successful sync, manual or scheduled, resets the count.
+NETWORK_RETRY_LIMIT = 12
+
+
+def _counts_as_ladder_attempt():
+    """
+    Analytics sync jobs that consume a rung of the metrics retry ladder.
+    A network failure never reached the provider, so it must not consume one.
+    """
+    return func.coalesce(ScheduledJob.result["status"].astext, "") != NETWORK_ERROR_STATE
+
+
+def consecutive_network_failures(db: Session, publication_id: UUID) -> tuple[int, datetime | None]:
+    """Returns (failures in a row, time of the most recent one) for a publication's analytics syncs."""
+    recent = (
+        db.query(ScheduledJob)
+        .filter(
+            ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
+            ScheduledJob.publication_id == publication_id,
+            ScheduledJob.status.in_([JobStatus.COMPLETED, JobStatus.FAILED]),
+        )
+        .order_by(ScheduledJob.completed_at.desc().nulls_last())
+        .limit(NETWORK_RETRY_LIMIT + 1)
+        .all()
+    )
+    count = 0
+    last_at = None
+    for job in recent:
+        if (job.result or {}).get("status") != NETWORK_ERROR_STATE:
+            break
+        if last_at is None:
+            last_at = job.completed_at
+        count += 1
+    return count, last_at
 
 
 class JobScheduler:
@@ -131,13 +170,14 @@ class JobScheduler:
         now = datetime.now(timezone.utc)
 
         for pub in pubs:
-            # How many previous completed or failed sync attempts exist?
+            # How many previous completed or failed sync attempts exist on the ladder?
             sync_attempts = (
                 db.query(ScheduledJob)
                 .filter(
                     ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
                     ScheduledJob.publication_id == pub.id,
                     ScheduledJob.status.in_([JobStatus.COMPLETED, JobStatus.FAILED]),
+                    _counts_as_ladder_attempt(),
                 )
                 .count()
             )
@@ -176,6 +216,14 @@ class JobScheduler:
                 continue
 
             if now >= next_due:
+                net_failures, last_net_at = consecutive_network_failures(db, pub.id)
+                if net_failures >= NETWORK_RETRY_LIMIT:
+                    # Paused after repeated network failures; surfaced in the schedule info.
+                    continue
+                if last_net_at is not None and now - last_net_at < NETWORK_RETRY_DELAY:
+                    # Network retry cooldown. Does not advance the ladder.
+                    continue
+
                 new_job = ScheduledJob(
                     id=uuid4(),
                     job_type=JobType.ANALYTICS_SYNC,
@@ -269,6 +317,22 @@ class JobScheduler:
                             "detail": str(http_exc.detail),
                         }
                         job.status = JobStatus.COMPLETED
+                    elif isinstance(http_exc.detail, dict) and http_exc.detail.get("state") == NETWORK_ERROR_STATE:
+                        # Recorded as FAILED so it is visible, but excluded from the ladder count.
+                        job.result = {
+                            "status": NETWORK_ERROR_STATE,
+                            "detail": http_exc.detail.get("message"),
+                        }
+                        job.status = JobStatus.FAILED
+                        job.error = f"{NETWORK_ERROR_STATE}: {http_exc.detail.get('technical')}"
+                        job.completed_at = datetime.now(timezone.utc)
+                        db.commit()
+                        logger.warning(
+                            "Worker %s: analytics sync for job %s could not reach the provider; retry scheduled",
+                            self.worker_id,
+                            job.id,
+                        )
+                        return False
                     else:
                         raise
 
@@ -294,12 +358,15 @@ class JobScheduler:
         """Performs one scheduler tick."""
         db = SessionLocal()
         try:
+            write_heartbeat(db, self.worker_id)
             self.recover_stale_claims(db)
             self.enqueue_due_discovery_jobs(db)
             self.enqueue_due_analytics_sync_jobs(db)
 
             processed = 0
             while True:
+                # Refresh between jobs so one long job does not look like a dead worker.
+                write_heartbeat(db, self.worker_id)
                 job = self.claim_next_job(db)
                 if not job:
                     break
@@ -353,52 +420,78 @@ def get_strategy_discovery_schedule_info(db: Session, strategy: ContentStrategy)
 
 
 def get_publication_sync_schedule_info(db: Session, publication: Publication) -> dict[str, Any]:
-    """Returns analytics sync history and next scheduled sync details for a publication."""
-    # Check for active scheduled job
-    active_job = (
-        db.query(ScheduledJob)
-        .filter(
-            ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
-            ScheduledJob.publication_id == publication.id,
-            ScheduledJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
-        )
-        .first()
+    """
+    Analytics sync state for a publication, derived from the job table.
+    Times are UTC ISO strings; the UI converts them to local time with a zone label.
+    """
+    now = datetime.now(timezone.utc)
+    sync_jobs = db.query(ScheduledJob).filter(
+        ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
+        ScheduledJob.publication_id == publication.id,
     )
 
-    last_job = (
-        db.query(ScheduledJob)
-        .filter(
-            ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
-            ScheduledJob.publication_id == publication.id,
-            ScheduledJob.status == JobStatus.COMPLETED,
-        )
-        .order_by(ScheduledJob.completed_at.desc())
-        .first()
-    )
-    completed_or_failed_count = (
-        db.query(ScheduledJob)
-        .filter(
-            ScheduledJob.job_type == JobType.ANALYTICS_SYNC,
-            ScheduledJob.publication_id == publication.id,
-            ScheduledJob.status.in_([JobStatus.COMPLETED, JobStatus.FAILED]),
-        )
-        .count()
-    )
+    active_job = sync_jobs.filter(
+        ScheduledJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING]),
+    ).order_by(ScheduledJob.scheduled_at.asc()).first()
+
+    last_job = sync_jobs.filter(
+        ScheduledJob.status == JobStatus.COMPLETED,
+    ).order_by(ScheduledJob.completed_at.desc()).first()
+
+    ladder_attempts = sync_jobs.filter(
+        ScheduledJob.status.in_([JobStatus.COMPLETED, JobStatus.FAILED]),
+        _counts_as_ladder_attempt(),
+    ).count()
+
+    last_finished = sync_jobs.filter(
+        ScheduledJob.status.in_([JobStatus.COMPLETED, JobStatus.FAILED]),
+    ).order_by(ScheduledJob.completed_at.desc().nulls_last()).first()
+
+    # A "not_ready" or "ready" completed job means Buffer answered. Network failures do not.
+    last_buffer_response = sync_jobs.filter(
+        ScheduledJob.status == JobStatus.COMPLETED,
+    ).order_by(ScheduledJob.completed_at.desc()).first()
+
+    net_failures, last_net_at = consecutive_network_failures(db, publication.id)
+    network_paused = net_failures >= NETWORK_RETRY_LIMIT
 
     last_attempt_time = last_job.completed_at if last_job else None
     if active_job:
         next_sync = active_job.scheduled_at
+    elif network_paused:
+        next_sync = None
     else:
         next_sync = get_next_analytics_sync_time(
             publication,
-            completed_or_failed_count,
+            ladder_attempts,
             last_attempt_time=last_attempt_time,
         )
+
+    last_attempt_outcome = None
+    if last_finished:
+        result_status = (last_finished.result or {}).get("status")
+        if result_status == NETWORK_ERROR_STATE:
+            last_attempt_outcome = NETWORK_ERROR_STATE
+        elif last_finished.status == JobStatus.FAILED:
+            last_attempt_outcome = "failed"
+        else:
+            last_attempt_outcome = result_status or "ready"
 
     return {
         "last_synced_at": last_job.completed_at.isoformat() if (last_job and last_job.completed_at) else None,
         "next_sync_at": next_sync.isoformat() if next_sync else None,
-        "sync_attempt_count": completed_or_failed_count,
+        "next_sync_overdue": bool(next_sync and next_sync <= now),
+        "sync_attempt_count": ladder_attempts,
+        "attempt_number": ladder_attempts + 1,
+        "last_attempt_at": last_finished.completed_at.isoformat() if (last_finished and last_finished.completed_at) else None,
+        "last_attempt_outcome": last_attempt_outcome,
+        "last_attempt_error": last_finished.error if last_finished else None,
+        "last_buffer_response_at": (
+            last_buffer_response.completed_at.isoformat()
+            if (last_buffer_response and last_buffer_response.completed_at) else None
+        ),
+        "network_failures_in_row": net_failures,
+        "network_retry_paused": network_paused,
+        "last_network_error_at": last_net_at.isoformat() if last_net_at else None,
+        "scheduler_running": scheduler_running(db, now=now),
     }
-
-

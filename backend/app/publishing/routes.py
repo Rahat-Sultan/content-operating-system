@@ -63,7 +63,24 @@ def sync_publication_analytics_endpoint(
     Calls configured analytics provider (e.g. Buffer) and appends a new historical snapshot.
     """
     from app.analytics.service import sync_publication_metrics
-    return sync_publication_metrics(db=db, publication_id=id)
+    from app.analytics.status import record_manual_sync_attempt
+
+    try:
+        snapshot = sync_publication_metrics(db=db, publication_id=id)
+    except HTTPException as exc:
+        # Record the click's outcome so "Last attempt" on the page stays true.
+        if exc.status_code == status.HTTP_409_CONFLICT:
+            outcome, message = "not_ready", "Buffer responded but has no metrics for this post yet."
+        elif isinstance(exc.detail, dict) and exc.detail.get("state") == "network_error":
+            outcome, message = "network_error", exc.detail.get("message")
+        else:
+            outcome, message = "failed", str(exc.detail)
+        technical = exc.detail.get("technical") if isinstance(exc.detail, dict) else None
+        record_manual_sync_attempt(db, id, outcome=outcome, message=message, technical=technical)
+        raise
+
+    record_manual_sync_attempt(db, id, outcome="ready")
+    return snapshot
 
 
 @router.post("/{id}/analytics/manual", response_model=AnalyticsResponse, status_code=status.HTTP_201_CREATED)

@@ -262,8 +262,10 @@ def read_workflow_run_publication(
         )
 
     from app.scheduler.service import get_publication_sync_schedule_info
+    from app.analytics.status import build_analytics_status
     from app.publishing.schemas import PublicationResponse
     schedule_info = get_publication_sync_schedule_info(db, publication)
+    analytics_status = build_analytics_status(db, publication)
 
     return PublicationResponse(
         id=publication.id,
@@ -278,5 +280,6 @@ def read_workflow_run_publication(
         created_at=publication.created_at,
         published_at=publication.published_at,
         schedule_info=schedule_info,
+        analytics_status=analytics_status,
     )
 

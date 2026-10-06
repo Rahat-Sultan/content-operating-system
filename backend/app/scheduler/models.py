@@ -18,6 +18,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 
 
+class WorkerHeartbeat(Base):
+    """
+    One row per scheduler process, refreshed on every loop. Lets the UI tell
+    whether automatic analytics sync is actually running.
+    """
+    __tablename__ = "worker_heartbeats"
+
+    worker_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+
 class JobType(str, enum.Enum):
     DISCOVERY = "DISCOVERY"
     ANALYTICS_SYNC = "ANALYTICS_SYNC"
