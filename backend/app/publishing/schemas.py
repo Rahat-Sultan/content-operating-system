@@ -29,3 +29,12 @@ class AnalyticsResponse(BaseModel):
     publication_id: UUID
     metrics: dict[str, Any]
     collected_at: datetime
+
+
+class ManualMetricsInput(BaseModel):
+    impressions: int = 0
+    reactions: int = 0
+    comments: int = 0
+    clicks: int = 0
+    shares: int = 0
+

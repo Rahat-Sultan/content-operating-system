@@ -184,17 +184,15 @@ class BufferPublisher(PublisherInterface):
                 "BUFFER_ACCESS_TOKEN is missing or set to placeholder. Cannot dispatch to Buffer."
             )
 
-        text_to_publish = request.body
-        if request.title and not text_to_publish.strip().startswith(request.title.strip()):
-            text_to_publish = f"{request.title.strip()}\n\n{text_to_publish.strip()}"
+        from app.publishing.render import render_for_linkedin
 
-        # Platform length constraints: LinkedIn posts have a hard 3,000 character limit
-        if request.platform.lower().strip() == "linkedin" and len(text_to_publish) > 2980:
-            logger.info(
-                "Adapting post text for LinkedIn platform limit (original len: %d -> 2980)",
-                len(text_to_publish),
-            )
-            text_to_publish = text_to_publish[:2950].rstrip() + "\n\n... [Read full deep-dive in repo]"
+        was_truncated = False
+        if request.platform.lower().strip() == "linkedin":
+            text_to_publish, was_truncated = render_for_linkedin(request.title, request.body)
+        else:
+            text_to_publish = request.body
+            if request.title and not text_to_publish.strip().startswith(request.title.strip()):
+                text_to_publish = f"{request.title.strip()}\n\n{text_to_publish.strip()}"
 
         with httpx.Client(timeout=self.timeout) as client:
             org_id, _ = self._resolve_organization(client)
@@ -280,5 +278,7 @@ class BufferPublisher(PublisherInterface):
                     "channel_service": channel.get("service"),
                     "post_id": post_id,
                     "idempotency_key": request.idempotency_key,
+                    "sent_text": text_to_publish,
+                    "was_truncated": was_truncated,
                 },
             )
