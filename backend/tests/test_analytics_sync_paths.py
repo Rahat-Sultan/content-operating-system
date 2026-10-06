@@ -118,5 +118,133 @@ class TestAnalyticsSyncPaths(unittest.TestCase):
         new_count = self.db.query(Analytics).filter(Analytics.publication_id == self.pub.id).count()
         self.assertEqual(new_count, initial_count)
 
+    @patch("app.analytics.service.get_analytics_provider")
+    def test_path4_metrics_unsupported_returns_422_no_snapshot(self, mock_get_provider):
+        from app.analytics.interface import MetricsUnsupportedError
+        mock_provider = MagicMock()
+        mock_provider.fetch_metrics.side_effect = MetricsUnsupportedError(
+            "Analytics are not supported for this channel type."
+        )
+        mock_get_provider.return_value = mock_provider
+
+        initial_count = self.db.query(Analytics).filter(Analytics.publication_id == self.pub.id).count()
+        with self.assertRaises(HTTPException) as cm:
+            sync_publication_metrics(self.db, self.pub.id)
+
+        self.assertEqual(cm.exception.status_code, 422)
+        self.assertIn("Metrics unsupported", cm.exception.detail)
+
+        # Confirm NO snapshot row was written
+        new_count = self.db.query(Analytics).filter(Analytics.publication_id == self.pub.id).count()
+        self.assertEqual(new_count, initial_count)
+
+
+class TestBufferProviderGating(unittest.TestCase):
+    """
+    CP-1.2: Tests using fixtures covering:
+    1. Real metrics with metricsUpdatedAt > sentAt -> snapshot returned
+    2. Null or uncollected metricsUpdatedAt (metricsUpdatedAt <= sentAt) -> MetricsNotAvailableError
+    3. Populated metricsUpdatedAt > sentAt with genuine zeros -> snapshot returned
+    4. Unsupported channel error -> MetricsUnsupportedError
+    """
+
+    @patch("app.analytics.buffer_provider.BufferAnalyticsProvider._execute_graphql")
+    def test_provider_real_metrics_returns_result(self, mock_gql):
+        from app.analytics.buffer_provider import BufferAnalyticsProvider
+        from app.analytics.interface import AnalyticsRequest
+        mock_gql.return_value = {
+            "data": {
+                "post": {
+                    "id": "ext-123",
+                    "status": "sent",
+                    "sentAt": "2026-10-05T07:00:00.000Z",
+                    "metricsUpdatedAt": "2026-10-05T08:00:00.000Z",
+                    "metrics": [
+                        {"name": "Reactions", "type": "reactions", "value": 5},
+                        {"name": "Comments", "type": "comments", "value": 2},
+                        {"name": "Impressions", "type": "impressions", "value": 150},
+                    ]
+                }
+            }
+        }
+        provider = BufferAnalyticsProvider(access_token="test-token")
+        req = AnalyticsRequest(publication_id=uuid4(), platform="linkedin", external_post_id="ext-123")
+        res = provider.fetch_metrics(req)
+        self.assertEqual(res.metrics["impressions"], 150)
+        self.assertEqual(res.metrics["reactions"], 5)
+        self.assertEqual(res.metrics["comments"], 2)
+
+    @patch("app.analytics.buffer_provider.BufferAnalyticsProvider._execute_graphql")
+    def test_provider_uncollected_placeholder_raises_not_available(self, mock_gql):
+        from app.analytics.buffer_provider import BufferAnalyticsProvider
+        from app.analytics.interface import AnalyticsRequest, MetricsNotAvailableError
+        # metricsUpdatedAt is before sentAt (the real Buffer placeholder pattern)
+        mock_gql.return_value = {
+            "data": {
+                "post": {
+                    "id": "ext-123",
+                    "status": "sent",
+                    "sentAt": "2026-10-05T07:39:00.550Z",
+                    "metricsUpdatedAt": "2026-10-05T07:38:59.501Z",
+                    "metrics": [
+                        {"name": "Reactions", "type": "reactions", "value": 0},
+                        {"name": "Comments", "type": "comments", "value": 0},
+                    ]
+                }
+            }
+        }
+        provider = BufferAnalyticsProvider(access_token="test-token")
+        req = AnalyticsRequest(publication_id=uuid4(), platform="linkedin", external_post_id="ext-123")
+        with self.assertRaises(MetricsNotAvailableError):
+            provider.fetch_metrics(req)
+
+    @patch("app.analytics.buffer_provider.BufferAnalyticsProvider._execute_graphql")
+    def test_provider_null_metrics_updated_at_raises_not_available(self, mock_gql):
+        from app.analytics.buffer_provider import BufferAnalyticsProvider
+        from app.analytics.interface import AnalyticsRequest, MetricsNotAvailableError
+        mock_gql.return_value = {
+            "data": {
+                "post": {
+                    "id": "ext-123",
+                    "status": "sent",
+                    "sentAt": "2026-10-05T07:39:00.550Z",
+                    "metricsUpdatedAt": None,
+                    "metrics": []
+                }
+            }
+        }
+        provider = BufferAnalyticsProvider(access_token="test-token")
+        req = AnalyticsRequest(publication_id=uuid4(), platform="linkedin", external_post_id="ext-123")
+        with self.assertRaises(MetricsNotAvailableError):
+            provider.fetch_metrics(req)
+
+    @patch("app.analytics.buffer_provider.BufferAnalyticsProvider._execute_graphql")
+    def test_provider_genuine_zeros_with_fresh_updated_at_returns_result(self, mock_gql):
+        from app.analytics.buffer_provider import BufferAnalyticsProvider
+        from app.analytics.interface import AnalyticsRequest
+        # Genuine collection ran subsequent day, truly 0 engagement
+        mock_gql.return_value = {
+            "data": {
+                "post": {
+                    "id": "ext-123",
+                    "status": "sent",
+                    "sentAt": "2026-10-02T06:59:31.615Z",
+                    "metricsUpdatedAt": "2026-10-05T02:31:54.002Z",
+                    "metrics": [
+                        {"name": "Reactions", "type": "reactions", "value": 0},
+                        {"name": "Comments", "type": "comments", "value": 0},
+                    ]
+                }
+            }
+        }
+        provider = BufferAnalyticsProvider(access_token="test-token")
+        req = AnalyticsRequest(publication_id=uuid4(), platform="linkedin", external_post_id="ext-123")
+        res = provider.fetch_metrics(req)
+        self.assertEqual(res.metrics["reactions"], 0)
+        self.assertEqual(res.metrics["comments"], 0)
+        self.assertEqual(res.metrics["metrics_updated_at"], "2026-10-05T02:31:54.002Z")
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -40,6 +40,15 @@ class MetricsNotAvailableError(AnalyticsError):
         super().__init__(message, is_transient=True)
 
 
+class MetricsUnsupportedError(AnalyticsError):
+    """
+    Provider does not support analytics for this channel type or post.
+    Non-retryable by scheduler.
+    """
+    def __init__(self, message: str = "Analytics are not supported for this channel type by the provider."):
+        super().__init__(message, is_transient=False)
+
+
 @dataclass
 class AnalyticsRequest:
     publication_id: UUID

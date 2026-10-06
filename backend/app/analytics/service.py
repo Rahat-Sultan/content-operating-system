@@ -9,6 +9,7 @@ from app.analytics.interface import (
     PermanentAnalyticsError,
     TransientAnalyticsError,
     MetricsNotAvailableError,
+    MetricsUnsupportedError,
     PostNotFoundError,
 )
 from app.analytics.factory import get_analytics_provider
@@ -62,6 +63,12 @@ def sync_publication_metrics(db: Session, publication_id: UUID) -> Analytics:
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Metrics not yet available: Buffer is still indexing this post. Please try again shortly.",
         ) from not_ready_err
+    except MetricsUnsupportedError as unsupported_err:
+        logger.warning("Metrics unsupported for publication %s: %s", publication_id, unsupported_err)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Metrics unsupported: {unsupported_err}",
+        ) from unsupported_err
     except PostNotFoundError as not_found_err:
         logger.error("Post permanently not found for publication %s: %s", publication_id, not_found_err)
         raise HTTPException(

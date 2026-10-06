@@ -12,6 +12,8 @@ from app.analytics.interface import (
     PermanentAnalyticsError,
     TransientAnalyticsError,
     MetricsNotAvailableError,
+    MetricsUnsupportedError,
+    PostNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,14 +108,36 @@ class BufferAnalyticsProvider(AnalyticsProvider):
                 f"Metrics for post '{post_id}' are not yet indexed by Buffer. Please try again shortly."
             )
 
+        sent_at_str = post_data.get("sentAt")
+        metrics_updated_at_str = post_data.get("metricsUpdatedAt")
+
+        if not metrics_updated_at_str:
+            raise MetricsNotAvailableError(
+                f"Buffer has not yet updated metrics for post '{post_id}' (metricsUpdatedAt is null). Please try again shortly."
+            )
+
+        # Parse timestamps to determine if Buffer has genuinely collected fresh metrics after post dispatch
+        # Buffer sets an initial metricsUpdatedAt <= sentAt prior to downstream network ingestion.
+        if sent_at_str and metrics_updated_at_str:
+            try:
+                sent_at_dt = datetime.fromisoformat(sent_at_str.replace("Z", "+00:00"))
+                metrics_updated_dt = datetime.fromisoformat(metrics_updated_at_str.replace("Z", "+00:00"))
+                if metrics_updated_dt <= sent_at_dt:
+                    raise MetricsNotAvailableError(
+                        f"Buffer metrics for post '{post_id}' reflect initial uncollected placeholders "
+                        f"(metricsUpdatedAt {metrics_updated_at_str} <= sentAt {sent_at_str}). Please wait for daily collection."
+                    )
+            except (ValueError, TypeError) as parse_err:
+                logger.warning("Could not parse sentAt/metricsUpdatedAt timestamps (%s): %s", parse_err, post_data)
+
         raw_metrics_list = post_data.get("metrics") or []
         metrics_dict: dict[str, Any] = {
             "is_stub": False,
             "is_initial": False,
             "provider": "buffer",
             "post_status": post_data.get("status"),
-            "sent_at": post_data.get("sentAt"),
-            "metrics_updated_at": post_data.get("metricsUpdatedAt"),
+            "sent_at": sent_at_str,
+            "metrics_updated_at": metrics_updated_at_str,
             "raw_metrics": raw_metrics_list,
             # Standardized fields with sensible defaults
             "reactions": 0,
