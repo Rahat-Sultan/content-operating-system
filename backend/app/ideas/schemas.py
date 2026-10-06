@@ -22,6 +22,8 @@ class IdeaResponse(BaseModel):
     scoring_metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    # Target platforms of the idea's strategy (lower case). Empty when the strategy has none.
+    platforms: list[str] = []
 
 
 class SourceItemSummary(BaseModel):

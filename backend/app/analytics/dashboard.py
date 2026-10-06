@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.analytics.models import Analytics
 from app.publishing.models import Publication, PublicationStatus
 from app.content.models import Content, ContentVersion
+from app.publishing.platforms import PLATFORMS, normalize_platform
 
 # external_id prefixes written by local test providers or placeholders. Not real posts.
 TEST_ID_PREFIXES = ("linkedin_", "test-ext-", "stub_", "buffer_idea_", "TEMP-")
@@ -19,7 +20,7 @@ def _is_test_post(external_id: str | None) -> bool:
     return bool(external_id) and external_id.startswith(TEST_ID_PREFIXES)
 
 
-def build_summary(db: Session, include_test: bool = False) -> dict[str, Any]:
+def build_summary(db: Session, include_test: bool = False, platform: str | None = None) -> dict[str, Any]:
     pubs = (
         db.query(Publication)
         .filter(Publication.status == PublicationStatus.PUBLISHED)
@@ -28,7 +29,10 @@ def build_summary(db: Session, include_test: bool = False) -> dict[str, Any]:
     )
     if not include_test:
         pubs = [p for p in pubs if not _is_test_post(p.external_id)]
-    pub_ids = [p.id for p in pubs]
+    all_pubs = pubs  # for the per-platform breakdown
+    if platform:
+        pubs = [p for p in pubs if normalize_platform(p.platform) == normalize_platform(platform)]
+    pub_ids = [p.id for p in all_pubs]
 
     # Newest valid snapshot and snapshot count per publication, in one pass.
     latest: dict = {}
@@ -82,8 +86,21 @@ def build_summary(db: Session, include_test: bool = False) -> dict[str, Any]:
             "is_test_post": _is_test_post(pub.external_id),
         })
 
+    known = [p["key"] for p in PLATFORMS]
+    breakdown = []
+    for info in PLATFORMS:
+        key = info["key"]
+        rows = [p for p in all_pubs if normalize_platform(p.platform) == key]
+        breakdown.append({"key": key, "label": info["label"], "connected": info["connected"],
+                          "post_count": len(rows)})
+    for key in sorted({normalize_platform(p.platform) for p in all_pubs} - set(known)):
+        breakdown.append({"key": key, "label": key, "connected": False,
+                          "post_count": len([p for p in all_pubs if normalize_platform(p.platform) == key])})
+
     with_data = [p for p in posts if p["has_snapshot"]]
     return {
+        "platform": normalize_platform(platform) if platform else None,
+        "platforms": breakdown,
         "post_count": len(posts),
         "posts_with_metrics": len(with_data),
         "total_impressions": sum(p["impressions"] or 0 for p in with_data),
