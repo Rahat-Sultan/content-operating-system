@@ -88,6 +88,10 @@ def create_workflow_run(
         run_metadata={},
     )
     db.add(run)
+    # The idea moves to In progress with the run, in the same commit.
+    from app.ideas.lifecycle import advance_idea
+    from app.ideas.models import IdeaStatus
+    advance_idea(db, idea_id, owner_id, IdeaStatus.IN_PROGRESS, [IdeaStatus.NEW, IdeaStatus.SELECTED])
     # Queued in the same commit as the run: a crash cannot leave a run without its start job.
     enqueue_workflow_job(db, "start", run_id, owner_id=owner_id)
 

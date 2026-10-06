@@ -55,6 +55,12 @@ def register(db: Session, email: str, password: str, display_name: str | None) -
         db.rollback()
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
     db.refresh(user)
+    # New accounts start with the default sources. A failure here must not block sign-up.
+    try:
+        from app.sources.catalog import seed_default_sources
+        seed_default_sources(db, user.id)
+    except Exception:
+        db.rollback()
     return user
 
 
