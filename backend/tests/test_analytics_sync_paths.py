@@ -219,10 +219,12 @@ class TestBufferProviderGating(unittest.TestCase):
             provider.fetch_metrics(req)
 
     @patch("app.analytics.buffer_provider.BufferAnalyticsProvider._execute_graphql")
-    def test_provider_genuine_zeros_with_fresh_updated_at_returns_result(self, mock_gql):
+    def test_placeholder_with_fresh_updated_at_is_rejected(self, mock_gql):
         from app.analytics.buffer_provider import BufferAnalyticsProvider
-        from app.analytics.interface import AnalyticsRequest
-        # Genuine collection ran subsequent day, truly 0 engagement
+        from app.analytics.interface import AnalyticsRequest, MetricsNotAvailableError
+        # Real response for post 6abf5652... (2026-10-06). metricsUpdatedAt is after sentAt,
+        # yet Buffer reports only Reactions and Comments at zero: an uncollected placeholder.
+        # Previously this test expected it stored as genuine zeros; the evidence says otherwise.
         mock_gql.return_value = {
             "data": {
                 "post": {
@@ -239,9 +241,33 @@ class TestBufferProviderGating(unittest.TestCase):
         }
         provider = BufferAnalyticsProvider(access_token="test-token")
         req = AnalyticsRequest(publication_id=uuid4(), platform="linkedin", external_post_id="ext-123")
+        with self.assertRaises(MetricsNotAvailableError):
+            provider.fetch_metrics(req)
+
+    @patch("app.analytics.buffer_provider.BufferAnalyticsProvider._execute_graphql")
+    def test_genuine_zeros_with_impressions_present_are_stored(self, mock_gql):
+        from app.analytics.buffer_provider import BufferAnalyticsProvider
+        from app.analytics.interface import AnalyticsRequest
+        # Buffer did measure the post: Impressions is reported, and it is 0.
+        mock_gql.return_value = {
+            "data": {
+                "post": {
+                    "id": "ext-123",
+                    "status": "sent",
+                    "sentAt": "2026-10-02T06:59:31.615Z",
+                    "metricsUpdatedAt": "2026-10-05T02:31:54.002Z",
+                    "metrics": [
+                        {"name": "Reactions", "type": "reactions", "value": 0},
+                        {"name": "Comments", "type": "comments", "value": 0},
+                        {"name": "Impressions", "type": "impressions", "value": 0},
+                    ]
+                }
+            }
+        }
+        provider = BufferAnalyticsProvider(access_token="test-token")
+        req = AnalyticsRequest(publication_id=uuid4(), platform="linkedin", external_post_id="ext-123")
         res = provider.fetch_metrics(req)
-        self.assertEqual(res.metrics["reactions"], 0)
-        self.assertEqual(res.metrics["comments"], 0)
+        self.assertEqual(res.metrics["impressions"], 0)
         self.assertEqual(res.metrics["metrics_updated_at"], "2026-10-05T02:31:54.002Z")
 
 

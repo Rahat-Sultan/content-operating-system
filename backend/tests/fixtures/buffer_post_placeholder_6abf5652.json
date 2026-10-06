@@ -1,0 +1,27 @@
+{
+  "data": {
+    "post": {
+      "id": "6abf5652b435ee01191424b9",
+      "status": "sent",
+      "sentAt": "2026-10-02T06:59:31.615Z",
+      "metricsUpdatedAt": "2026-10-06T01:32:06.978Z",
+      "metrics": [
+        {
+          "name": "Reactions",
+          "type": "reactions",
+          "value": 0,
+          "unit": "count",
+          "description": "How many people reacted to your post. Includes Like, Celebrate, Support, and more."
+        },
+        {
+          "name": "Comments",
+          "type": "comments",
+          "value": 0,
+          "unit": "count",
+          "description": "The number of comments your post received (including nested replies). Shows when your post is starting conversations, not just getting seen."
+        }
+      ]
+    }
+  },
+  "errors": null
+}

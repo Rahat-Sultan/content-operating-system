@@ -8,6 +8,7 @@ from app.analytics.interface import (
     AnalyticsRequest,
     PermanentAnalyticsError,
     TransientAnalyticsError,
+    NetworkAnalyticsError,
     MetricsNotAvailableError,
     MetricsUnsupportedError,
     PostNotFoundError,
@@ -16,6 +17,9 @@ from app.analytics.factory import get_analytics_provider
 from app.publishing.models import Publication, PublicationStatus
 
 logger = logging.getLogger(__name__)
+
+# Value of the 503 detail "state" and of ScheduledJob.result["status"] for a network failure.
+NETWORK_ERROR_STATE = "network_error"
 
 
 def sync_publication_metrics(db: Session, publication_id: UUID) -> Analytics:
@@ -81,6 +85,18 @@ def sync_publication_metrics(db: Session, publication_id: UUID) -> Analytics:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Analytics provider rejected request: {perm_err}",
         ) from perm_err
+    except NetworkAnalyticsError as net_err:
+        # Not a metrics answer: this server could not reach the provider. Never counted as
+        # an attempt on the metrics retry ladder, and never written as a snapshot.
+        logger.error("Network error reaching analytics provider for publication %s: %s", publication_id, net_err)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "state": NETWORK_ERROR_STATE,
+                "message": "Couldn't reach Buffer from this server (network error). No metrics were checked.",
+                "technical": str(net_err),
+            },
+        ) from net_err
     except TransientAnalyticsError as trans_err:
         logger.error("Transient error syncing metrics for publication %s: %s", publication_id, trans_err)
         raise HTTPException(

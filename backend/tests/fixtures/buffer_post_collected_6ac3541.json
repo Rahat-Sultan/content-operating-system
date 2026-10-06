@@ -1,0 +1,48 @@
+{
+  "data": {
+    "post": {
+      "id": "6ac3541363761da98b71e85b",
+      "status": "sent",
+      "sentAt": "2026-10-05T07:39:00.550Z",
+      "metricsUpdatedAt": "2026-10-06T04:32:58.296Z",
+      "metrics": [
+        {
+          "name": "Reactions",
+          "type": "reactions",
+          "value": 2,
+          "unit": "count",
+          "description": "How many people reacted to your post. Includes Like, Celebrate, Support, and more."
+        },
+        {
+          "name": "Comments",
+          "type": "comments",
+          "value": 0,
+          "unit": "count",
+          "description": "The number of comments your post received (including nested replies). Shows when your post is starting conversations, not just getting seen."
+        },
+        {
+          "name": "Eng. Rate",
+          "type": "engagementRate",
+          "value": 2.11,
+          "unit": "percentage",
+          "description": "The percentage of people who interacted with your post compared to how many saw it. Balances views and actions to show how compelling your posts are."
+        },
+        {
+          "name": "Impressions",
+          "type": "impressions",
+          "value": 95,
+          "unit": "count",
+          "description": "How many times your post was shown on screen. This can include multiple views by the same person. Useful for spotting how often your content gets surfaced."
+        },
+        {
+          "name": "Reach",
+          "type": "reach",
+          "value": 51,
+          "unit": "count",
+          "description": "How many unique people saw your post. Unlike impressions, each person is only counted once. Gives you a sense of how far your content spread."
+        }
+      ]
+    }
+  },
+  "errors": null
+}

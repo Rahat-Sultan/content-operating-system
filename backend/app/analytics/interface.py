@@ -18,6 +18,16 @@ class TransientAnalyticsError(AnalyticsError):
         super().__init__(message, is_transient=True)
 
 
+class NetworkAnalyticsError(TransientAnalyticsError):
+    """
+    This server could not reach the provider (DNS failure, refused or reset
+    connection, timeout). Says nothing about whether the provider has metrics,
+    so it must never be reported as "not yet collected" or counted as an
+    attempt on the metrics retry ladder.
+    """
+    pass
+
+
 class PermanentAnalyticsError(AnalyticsError):
     """Terminal failure (e.g. bad credentials, post deleted/invalid); do not retry."""
     def __init__(self, message: str):

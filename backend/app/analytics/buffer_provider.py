@@ -11,6 +11,7 @@ from app.analytics.interface import (
     AnalyticsResult,
     PermanentAnalyticsError,
     TransientAnalyticsError,
+    NetworkAnalyticsError,
     MetricsNotAvailableError,
     MetricsUnsupportedError,
     PostNotFoundError,
@@ -19,6 +20,32 @@ from app.analytics.interface import (
 logger = logging.getLogger(__name__)
 
 BUFFER_GRAPHQL_ENDPOINT = "https://api.buffer.com"
+
+# The only metric types an uncollected placeholder carries (verified 2026-10-06 against
+# real responses; see DECISIONS.md ADR-018). Anything else means Buffer collected data.
+PLACEHOLDER_METRIC_TYPES = frozenset({"reactions", "comments"})
+
+
+def _metric_type(metric: dict[str, Any]) -> str:
+    return (metric.get("type") or "").lower()
+
+
+def build_post_metrics_query(post_id: str) -> str:
+    return f"""{{
+  post(input: {{ id: "{post_id}" }}) {{
+    id
+    status
+    sentAt
+    metricsUpdatedAt
+    metrics {{
+      name
+      type
+      value
+      unit
+      description
+    }}
+  }}
+}}"""
 
 
 class BufferAnalyticsProvider(AnalyticsProvider):
@@ -48,7 +75,7 @@ class BufferAnalyticsProvider(AnalyticsProvider):
                 res = client.post(BUFFER_GRAPHQL_ENDPOINT, headers=headers, json=payload)
         except (httpx.TimeoutException, httpx.NetworkError) as net_err:
             logger.error("Network error communicating with Buffer GraphQL API for analytics: %s", net_err)
-            raise TransientAnalyticsError(f"Network error querying Buffer analytics: {net_err}") from net_err
+            raise NetworkAnalyticsError(f"Network error querying Buffer analytics: {net_err}") from net_err
 
         if res.status_code == 429:
             raise TransientAnalyticsError(f"Buffer rate limit exceeded (HTTP 429): {res.text[:200]}")
@@ -74,23 +101,7 @@ class BufferAnalyticsProvider(AnalyticsProvider):
         if not post_id:
             raise PermanentAnalyticsError("No external_post_id provided on publication to query Buffer.")
 
-        query = f"""{{
-  post(input: {{ id: "{post_id}" }}) {{
-    id
-    status
-    sentAt
-    metricsUpdatedAt
-    metrics {{
-      name
-      type
-      value
-      unit
-      description
-    }}
-  }}
-}}"""
-
-        data = self._execute_graphql(query)
+        data = self._execute_graphql(build_post_metrics_query(post_id))
         errors = data.get("errors")
         if errors:
             err_msg = errors[0].get("message", "Unknown GraphQL error")
@@ -116,21 +127,23 @@ class BufferAnalyticsProvider(AnalyticsProvider):
                 f"Buffer has not yet updated metrics for post '{post_id}' (metricsUpdatedAt is null). Please try again shortly."
             )
 
-        # Parse timestamps to determine if Buffer has genuinely collected fresh metrics after post dispatch
-        # Buffer sets an initial metricsUpdatedAt <= sentAt prior to downstream network ingestion.
-        if sent_at_str and metrics_updated_at_str:
-            try:
-                sent_at_dt = datetime.fromisoformat(sent_at_str.replace("Z", "+00:00"))
-                metrics_updated_dt = datetime.fromisoformat(metrics_updated_at_str.replace("Z", "+00:00"))
-                if metrics_updated_dt <= sent_at_dt:
-                    raise MetricsNotAvailableError(
-                        f"Buffer metrics for post '{post_id}' reflect initial uncollected placeholders "
-                        f"(metricsUpdatedAt {metrics_updated_at_str} <= sentAt {sent_at_str}). Please wait for daily collection."
-                    )
-            except (ValueError, TypeError) as parse_err:
-                logger.warning("Could not parse sentAt/metricsUpdatedAt timestamps (%s): %s", parse_err, post_data)
-
         raw_metrics_list = post_data.get("metrics") or []
+
+        # Gate on the metric shape, not on timestamps. metricsUpdatedAt is the time of the
+        # last Buffer ingestion, not evidence of collected data: placeholder responses
+        # (Reactions/Comments at zero) carry metricsUpdatedAt > sentAt, so a timestamp gate
+        # accepts them. Only a response that reports something beyond Reactions/Comments
+        # (e.g. Impressions, Reach) has collected data.
+        if not raw_metrics_list:
+            raise MetricsNotAvailableError(
+                f"Buffer returned no metrics for post '{post_id}' yet."
+            )
+        if not any(_metric_type(m) not in PLACEHOLDER_METRIC_TYPES for m in raw_metrics_list):
+            raise MetricsNotAvailableError(
+                f"Buffer reports only Reactions and Comments for post '{post_id}' "
+                f"(no impression data yet). Treated as uncollected."
+            )
+
         metrics_dict: dict[str, Any] = {
             "is_stub": False,
             "is_initial": False,
