@@ -357,3 +357,62 @@ def create_human_edit_version(
         raise HTTPException(status_code=409, detail="Another edit was saved at the same time. Reload and try again.") from exc
     db.refresh(new_version)
     return new_version
+
+
+def retry_publish(db: Session, run_id: UUID, owner_id) -> WorkflowRun:
+    """
+    Retries publishing for a FAILED run whose latest draft is already approved.
+
+    The claim is a conditional UPDATE (FAILED -> PUBLISHING), so two clicks cannot both
+    publish. The publish itself goes through the same publisher node the graph uses,
+    which keeps idempotency and the image checks in one place.
+    """
+    from app.accounts.context import set_current_owner
+    from app.graph.nodes.publisher import publisher_node
+
+    run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id, WorkflowRun.owner_id == owner_id).first()
+    if not run:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workflow run {run_id} not found.")
+
+    content = db.query(Content).filter(Content.workflow_run_id == run_id).first()
+    latest = None
+    if content:
+        latest = (
+            db.query(ContentVersion)
+            .filter(ContentVersion.content_id == content.id)
+            .order_by(ContentVersion.version_number.desc())
+            .first()
+        )
+    approval = (
+        db.query(Approval).filter(Approval.content_version_id == latest.id).first() if latest else None
+    )
+    if latest is None or approval is None or approval.status != ApprovalStatus.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only a run whose latest draft was approved can retry publishing.",
+        )
+
+    claimed = (
+        db.query(WorkflowRun)
+        .filter(WorkflowRun.id == run_id, WorkflowRun.owner_id == owner_id, WorkflowRun.status == WorkflowRunStatus.FAILED)
+        .update({"status": WorkflowRunStatus.PUBLISHING, "error": None}, synchronize_session=False)
+    )
+    db.commit()
+    if claimed != 1:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Run is not in FAILED state.")
+
+    set_current_owner(owner_id)
+    try:
+        publisher_node({"current_content_version_id": latest.id, "workflow_run_id": run_id})
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Publishing failed again: {exc}",
+        )
+
+    db.query(WorkflowRun).filter(
+        WorkflowRun.id == run_id, WorkflowRun.status == WorkflowRunStatus.PUBLISHING
+    ).update({"status": WorkflowRunStatus.COMPLETED}, synchronize_session=False)
+    db.commit()
+    db.expire_all()
+    return db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
