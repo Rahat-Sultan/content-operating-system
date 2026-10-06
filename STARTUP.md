@@ -125,6 +125,10 @@ Open `http://localhost:3000` in the browser. Always port 3000.
 - Verify ideas load and render with scores.
 - Check browser devtools console: no CORS errors, no failed API calls.
 
+### Refresh vs. Sync Metrics Semantics
+- **Refresh Button (Top Right)**: Re-reads local application data from the local database for the workflow run, idea, research, brief, publication, and existing analytics snapshots. Invalidates client-side React Query cache and displays an explicit green "Updated HH:MM:SS" badge on completion.
+- **Sync Metrics Button (Publication Card)**: Calls the external analytics provider API (e.g. Buffer GraphQL) to fetch live metrics. If metrics are still uncollected by Buffer, returns HTTP 409 and shows Amber "Metrics Not Yet Available". Automatically re-fetches local snapshots when new data arrives.
+
 ---
 
 ## 7. Scheduler Startup & Testing (Background Worker)

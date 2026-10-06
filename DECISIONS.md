@@ -213,3 +213,27 @@ Deliberately defer feeding analytics metrics directly back into idea discovery/s
 Reason:
 
 Currently there are only a handful of published posts, which provides insufficient signal for statistical scoring, and metrics on recent posts are still stabilizing. This feedback loop will be revisited when there are roughly 20 or more published posts with settled performance metrics.
+
+---
+
+## ADR-018 — Analytics Validity Rule: Never Store Provider Placeholders as Real Data
+
+Decision:
+
+External provider analytics responses must only generate an `analytics` database snapshot if the provider explicitly certifies that post performance metrics have been collected (indicated by `metricsUpdatedAt > sentAt`). Responses where metrics have not yet been ingested return `MetricsNotAvailableError` (HTTP 409) or `MetricsUnsupportedError`, writing zero database rows.
+
+Reason:
+
+Buffer returns initial placeholder records immediately after publication where comments, reactions, and impressions are empty or zero, and `metricsUpdatedAt` reflects the publication dispatch timestamp. Treating uncollected placeholders as genuine performance data corrupted reporting by recording zero performance for posts that had real impressions on LinkedIn.
+
+---
+
+## ADR-019 — LinkedIn Plain-Text Rendering and Draft Immutability
+
+Decision:
+
+LinkedIn posts are converted from Markdown to clean plain text via `render_for_linkedin` strictly at the publishing dispatch boundary, saving the exact text in publication audit metadata. The stored `ContentVersion` body remains immutable and intact in Markdown.
+
+Reason:
+
+LinkedIn does not parse Markdown; raw `#` headers, `**bold**`, and `[link](url)` markup degrade post quality. The human reviewer verifies the Markdown draft and sees a 1:1 plain-text LinkedIn preview with character limit checks before approving. Preserving Markdown in `content_versions` maintains editorial formatting for potential multi-platform expansion.

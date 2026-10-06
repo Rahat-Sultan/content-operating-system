@@ -198,6 +198,7 @@ PUBLISHING (atomic status update)
 1. **Deterministic Idempotency Key**: `f"{content_version_id}:{platform}"` (retries MUST reuse the same key).
 2. **PostgreSQL Protection**: `UNIQUE(idempotency_key)` protects against concurrent dispatch races. If two workers invoke publish concurrently, the unique constraint ensures only one row is created; the secondary caller gracefully receives and returns the winning publication.
 3. **Version Lock**: Publishing strictly verifies that `ContentVersion` belongs to the `WorkflowRun`, has status `APPROVED`, and matches the latest version. Stale or rejected versions can never publish.
+4. **LinkedIn Plain Text Rendering**: LinkedIn does not render Markdown. Drafts are rendered via `render_for_linkedin(title, markdown_body)` immediately before transmission to Buffer. The original `ContentVersion` record in PostgreSQL remains immutable and intact. Heading markers, bold/italics, and fences are converted to clean plain text; duplicate title headers are stripped; bullets become `•`; text is boundary-truncated at 3,000 characters. Audit metadata (`sent_text`, `was_truncated`) is saved on the publication.
 
 ---
 
@@ -220,9 +221,11 @@ Update status (COMPLETED / FAILED) + error / result
 - Discovery is strictly read-only signal ingestion + candidate idea scoring; it never automatically initiates production, approvals, or publishing.
 - If no new items are fetched from attached feeds, LLM scoring is safely skipped to conserve token budget.
 
-### Analytics Sync Backoff
+### Analytics Sync Backoff & Metric Validity Rule
 - For published posts with valid external post IDs, metrics are synced on an exponential backoff schedule: 15m, 1h, 6h, 24h, 72h, 7d (stopping after 6 attempts).
-- `MetricsNotAvailableError` (HTTP 409 propagation delay) is treated as a normal non-error outcome that schedules the next backoff attempt without writing a snapshot.
+- **Metric Validity Rule**: Uncollected metrics from Buffer (where `metricsUpdatedAt <= sentAt` or missing) are NEVER stored as zeros. Storing zeros as real data is forbidden. The provider raises `MetricsNotAvailableError` (HTTP 409), leaving the `analytics` table unchanged and scheduling the next backoff retry.
+- **Unsupported Channels**: If a channel permanently lacks metrics support (e.g. personal profiles), `MetricsUnsupportedError` is raised and the job stops retrying.
+- **Manual Fallback**: Users can enter true metrics directly from LinkedIn (`POST /api/publications/{id}/analytics/manual`).
 - Stub/mock publications (e.g. `linkedin_*`, `test-ext-*`) are ignored by the scheduler.
 - Multi-process worker concurrency is guaranteed with `SKIP LOCKED`. Worker crash recovery uses lease timeout reset after 5 minutes.
 
