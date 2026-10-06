@@ -9,6 +9,11 @@ from app.scheduler.models import ScheduledJob
 
 # Backoff delays in minutes after publishing
 ANALYTICS_BACKOFF_MINUTES = [15, 60, 360, 1440, 4320, 10080]  # 15m, 1h, 6h, 24h, 72h, 7d
+# Buffer refreshes post metrics about once a day, so after the ladder keep checking daily
+# for ANALYTICS_POLL_WINDOW_DAYS after publication. Without this, posts older than a week
+# never show their later numbers.
+ANALYTICS_DAILY_POLL_MINUTES = 1440
+ANALYTICS_POLL_WINDOW_DAYS = 30
 
 
 def get_min_discovery_interval_hours() -> float:
@@ -65,7 +70,7 @@ def get_next_analytics_sync_time(
     Computes the scheduled time for the next analytics sync attempt:
     - Skips publications that are not PUBLISHED or have no external_id.
     - If publication has an initial/stub indicator without real ID, skip.
-    - After len(ANALYTICS_BACKOFF_MINUTES) attempts, stops (returns None).
+    - After the ladder, checks daily until the 30-day window after publication closes.
     - If last_attempt_time is provided and attempts > 0, next time is computed
       from the last attempt using the step's interval, or from published_at
       if last_attempt_time is not set.
@@ -79,18 +84,29 @@ def get_next_analytics_sync_time(
     if ext_id.startswith(("linkedin_", "test-ext-", "stub_", "buffer_idea_")):
         return None
 
+    published = publication.published_at or publication.created_at
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=timezone.utc)
+    window_end = published + timedelta(days=ANALYTICS_POLL_WINDOW_DAYS)
+
     if sync_attempt_count >= len(ANALYTICS_BACKOFF_MINUTES):
-        return None
+        # Past the ladder: one check a day until the window closes.
+        anchor = last_attempt_time or published
+        if anchor.tzinfo is None:
+            anchor = anchor.replace(tzinfo=timezone.utc)
+        next_time = anchor + timedelta(minutes=ANALYTICS_DAILY_POLL_MINUTES)
+        return next_time if next_time <= window_end else None
 
     delay_minutes = ANALYTICS_BACKOFF_MINUTES[sync_attempt_count]
 
     if last_attempt_time is not None and sync_attempt_count > 0:
         base_time = last_attempt_time
     else:
-        base_time = publication.published_at or publication.created_at
+        base_time = published
 
     if base_time.tzinfo is None:
         base_time = base_time.replace(tzinfo=timezone.utc)
 
-    return base_time + timedelta(minutes=delay_minutes)
+    next_time = base_time + timedelta(minutes=delay_minutes)
+    return next_time if next_time <= window_end else None
 

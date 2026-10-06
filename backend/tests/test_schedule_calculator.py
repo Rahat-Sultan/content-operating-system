@@ -95,9 +95,22 @@ class TestScheduleCalculations(unittest.TestCase):
         next_t5 = get_next_analytics_sync_time(pub, 5)
         self.assertEqual(next_t5, base_time + timedelta(minutes=10080))
 
-        # Attempt 6 (beyond last step): returns None
-        next_t6 = get_next_analytics_sync_time(pub, 6)
-        self.assertIsNone(next_t6)
+        # Attempt 6 (past the ladder): daily check, 24 h after the last attempt
+        last = base_time + timedelta(days=7)
+        next_t6 = get_next_analytics_sync_time(pub, 6, last_attempt_time=last)
+        self.assertEqual(next_t6, last + timedelta(hours=24))
+
+    def test_daily_polling_stops_after_the_window(self):
+        published = datetime.now(timezone.utc) - timedelta(days=31)
+        pub = Publication(id=uuid4(), status=PublicationStatus.PUBLISHED,
+                          external_id="6ac3541363761da98b71e85b", published_at=published)
+        last = published + timedelta(days=29, hours=20)
+        self.assertIsNone(get_next_analytics_sync_time(pub, 9, last_attempt_time=last))
+
+        # Same publication, last attempt 5 days in: still inside the window.
+        inside = published + timedelta(days=5)
+        pub.published_at = published
+        self.assertIsNotNone(get_next_analytics_sync_time(pub, 9, last_attempt_time=inside))
 
     def test_analytics_sync_skips_non_published_or_missing_id(self):
         pub_pending = Publication(
