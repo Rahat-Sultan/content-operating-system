@@ -30,6 +30,24 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   CANCELLED: "bg-slate-800 text-slate-400 border-slate-700",
 };
 
+/** Local date, time and zone label, e.g. "Oct 6, 2026, 10:04 AM PKT". */
+function fmtDateTime(iso?: string | null, fallback = "—") {
+  if (!iso) return fallback;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return fallback;
+  const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+    .formatToParts(d)
+    .find((p) => p.type === "timeZoneName")?.value ?? "";
+  return `${d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ${zone}`.trim();
+}
+
+const OUTCOME_LABELS: Record<string, string> = {
+  ready: "metrics returned",
+  not_ready: "Buffer had no metrics yet",
+  network_error: "network error, Buffer not reached",
+  failed: "failed",
+};
+
 export default function WorkflowRunDetailPage({
   params,
 }: {
@@ -45,6 +63,7 @@ export default function WorkflowRunDetailPage({
 
   // Manual metrics modal / form state
   const [showManualMetricsForm, setShowManualMetricsForm] = useState(false);
+  const [showInvalidRows, setShowInvalidRows] = useState(false);
   const [manualImpressions, setManualImpressions] = useState(0);
   const [manualReactions, setManualReactions] = useState(0);
   const [manualComments, setManualComments] = useState(0);
@@ -149,6 +168,7 @@ export default function WorkflowRunDetailPage({
     },
     onError: (err: any) => {
       setSyncError(err?.message || "Failed to sync metrics from provider.");
+      refetchPublication();
     },
   });
 
@@ -553,6 +573,13 @@ export default function WorkflowRunDetailPage({
                         Real performance metrics polled from Buffer
                       </p>
                     </div>
+                    <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setShowManualMetricsForm(!showManualMetricsForm)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-semibold transition-colors"
+                    >
+                      {showManualMetricsForm ? "Cancel manual entry" : "Enter metrics from LinkedIn"}
+                    </button>
                     <button
                       onClick={() => syncMetricsMutation.mutate()}
                       disabled={syncMetricsMutation.isPending}
@@ -567,161 +594,108 @@ export default function WorkflowRunDetailPage({
                         <span>Sync Metrics</span>
                       )}
                     </button>
+                    </div>
                   </div>
 
-                  {syncError && (
-                    <div className={`p-3 rounded-lg text-xs font-mono border ${
-                      syncError.toLowerCase().includes("not yet available") || syncError.toLowerCase().includes("indexing")
-                        ? "bg-amber-950/40 border-amber-800 text-amber-300"
-                        : syncError.toLowerCase().includes("not found")
-                        ? "bg-rose-950/50 border-rose-800 text-rose-300"
-                        : "bg-rose-950/50 border-rose-800 text-rose-300"
-                    }`}>
-                      {syncError.toLowerCase().includes("not yet available") || syncError.toLowerCase().includes("indexing") ? (
-                        <div className="flex items-center space-x-2">
-                          <span>⏳</span>
-                          <span>{syncError}</span>
-                        </div>
-                      ) : syncError.toLowerCase().includes("not found") ? (
-                        <div className="flex items-center space-x-2">
-                          <span>✕</span>
-                          <span>Permanent Error: Post not found on provider. Check external post ID.</span>
-                        </div>
-                      ) : (
-                        <span>Sync Error: {syncError}</span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Latest Metrics Summary Cards */}
+                  {/* One analytics status, derived by the backend from the most recent attempt (CP-D.1, D.5) */}
                   {(() => {
-                    // CP-1.3: Ignore quarantined rows and stub rows for headline metrics
-                    const validSnapshots = (analyticsSnapshots || []).filter(
+                    const status = publication.analytics_status;
+                    const schedule = publication.schedule_info;
+                    const state = status?.state ?? "none";
+                    const allSnapshots = analyticsSnapshots || [];
+                    const validSnapshots = allSnapshots.filter(
                       (snap) => !snap.metrics.is_stub && !snap.metrics.invalid_reason
                     );
-                    const latestValidSnapshot = validSnapshots.length > 0 ? validSnapshots[0] : null;
-                    const metrics = latestValidSnapshot?.metrics || null;
+                    const latestValid = validSnapshots[0] ?? null;
+                    const metrics = latestValid?.metrics ?? null;
+                    const showNumbers = !!metrics && (state === "available" || state === "manual");
+                    const visibleSnapshots = showInvalidRows ? allSnapshots : validSnapshots;
+                    const hiddenCount = allSnapshots.length - validSnapshots.length;
 
-                    // Determine state for CP-1.4:
-                    // 1. Available: latestValidSnapshot exists
-                    // 2. Not Yet Available (Amber): no valid snapshot, but scheduler has future retry or attempt < 6
-                    // 3. Not Available / Unsupported: syncError says unsupported or attempts exhausted or channel not providing metrics
-                    const hasValidMetrics = !!latestValidSnapshot;
-                    const isUnsupported = syncError?.toLowerCase().includes("unsupported") || 
-                      syncError?.toLowerCase().includes("not available from buffer") ||
-                      publication.schedule_info?.sync_attempt_count === 6 && !hasValidMetrics;
-                    const nextSyncAt = publication.schedule_info?.next_sync_at;
+                    const headline =
+                      state === "available" ? "Metrics from Buffer"
+                      : state === "manual" ? "Entered manually"
+                      : state === "not_collected_yet" ? "Buffer has no metrics for this post yet"
+                      : state === "network_error" ? "Couldn't reach Buffer from this server"
+                      : state === "failed" ? "Last sync failed"
+                      : "No metrics checked yet";
+                    const tone =
+                      state === "network_error" || state === "failed"
+                        ? "bg-rose-950/40 border-rose-800 text-rose-200"
+                        : state === "available" || state === "manual"
+                        ? "bg-slate-900/60 border-slate-800 text-slate-200"
+                        : "bg-amber-950/30 border-amber-800/80 text-amber-200";
+                    const reason =
+                      state === "not_collected_yet"
+                        ? `Buffer responded at ${fmtDateTime(status?.last_buffer_response_at)} but has no metrics for this post yet.`
+                        : state === "network_error"
+                        ? `This server could not reach Buffer (network error). Last successful contact: ${fmtDateTime(status?.last_buffer_response_at, "none")}.`
+                        : state === "failed"
+                        ? `Provider error: ${status?.last_attempt_message ?? "unknown"}`
+                        : null;
+                    const collected =
+                      latestValid && state === "manual" ? `Entered manually on ${fmtDateTime(latestValid.collected_at)}`
+                      : latestValid && state === "available" ? `Collected ${fmtDateTime(latestValid.collected_at)}`
+                      : null;
+                    const attemptNo = status?.attempt_number ?? schedule?.attempt_number ?? 1;
+                    const lastAttempt = status?.last_attempt_at
+                      ? `${fmtDateTime(status.last_attempt_at)} — ${OUTCOME_LABELS[status.last_attempt_outcome ?? ""] ?? status.last_attempt_outcome}${status.last_attempt_source === "manual" ? " (your click)" : ""}`
+                      : "none yet";
 
                     return (
                       <div className="space-y-4">
-                        {/* State 1: Metrics Available */}
-                        {hasValidMetrics && metrics ? (
-                          <div className="space-y-3">
-                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                                  Impressions
-                                </span>
-                                <span className="text-lg font-bold text-slate-100 font-mono">
-                                  {metrics.impressions ?? 0}
-                                </span>
-                              </div>
-                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                                  Clicks
-                                </span>
-                                <span className="text-lg font-bold text-slate-100 font-mono">
-                                  {metrics.clicks ?? 0}
-                                </span>
-                              </div>
-                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                                  Likes / Reactions
-                                </span>
-                                <span className="text-lg font-bold text-slate-100 font-mono">
-                                  {metrics.likes ?? metrics.reactions ?? 0}
-                                </span>
-                              </div>
-                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                                  Comments
-                                </span>
-                                <span className="text-lg font-bold text-slate-100 font-mono">
-                                  {metrics.comments ?? 0}
-                                </span>
-                              </div>
-                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                                  Shares
-                                </span>
-                                <span className="text-lg font-bold text-slate-100 font-mono">
-                                  {metrics.shares ?? 0}
-                                </span>
-                              </div>
-                              <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
-                                <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">
-                                  Last Synced
-                                </span>
-                                <span className="text-[11px] font-medium text-slate-300 block truncate" data-testid="analytics-last-synced" title={latestValidSnapshot.collected_at}>
-                                  {new Date(latestValidSnapshot.collected_at).toLocaleTimeString()}
-                                </span>
-                                <span className="text-[9px] text-slate-400 block capitalize">
-                                  {metrics.provider === "manual" ? "Manual Entry" : metrics.provider || "Buffer"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : isUnsupported ? (
-                          /* State 3: Not available from Buffer for this channel type */
-                          <div
-                            data-testid="analytics-unsupported-state"
-                            className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-300 space-y-2"
-                          >
-                            <div className="flex items-center space-x-2 text-slate-300 text-xs font-semibold">
-                              <span className="text-base">ℹ️</span>
-                              <span>Buffer isn't providing metrics for this post. Check LinkedIn directly.</span>
-                            </div>
-                            <p className="text-[11px] text-slate-400">
-                              Personal LinkedIn profiles require downstream batch metric ingestion or manual entry.
-                            </p>
-                          </div>
-                        ) : (
-                          /* State 2: Not Yet Available (Amber) with retry time */
-                          <div
-                            data-testid="analytics-not-yet-available"
-                            className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/80 text-amber-200 space-y-2"
-                          >
-                            <div className="flex items-center space-x-2 text-xs font-semibold text-amber-300">
-                              <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
-                              <span>Metrics Not Yet Available</span>
-                            </div>
-                            <p className="text-xs text-amber-200/90">
-                              Buffer has not yet updated live metrics for this post (awaiting source network collection).
-                            </p>
-                            <div className="text-[11px] text-amber-300/80 font-mono flex items-center space-x-3 pt-1">
-                              <span>
-                                Next scheduled sync: {nextSyncAt ? new Date(nextSyncAt).toLocaleTimeString() : "Pending"}
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                          {[
+                            ["Impressions", metrics?.impressions],
+                            ["Clicks", metrics?.clicks],
+                            ["Likes / Reactions", metrics?.likes ?? metrics?.reactions],
+                            ["Comments", metrics?.comments],
+                            ["Shares", metrics?.shares],
+                          ].map(([label, value]) => (
+                            <div key={label as string} className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
+                              <span className="text-[10px] uppercase font-semibold text-slate-500 block mb-1">{label}</span>
+                              <span className="text-lg font-bold text-slate-100 font-mono">
+                                {showNumbers ? ((value as number | undefined) ?? 0) : "—"}
                               </span>
-                              <span>•</span>
-                              <span>Attempt {publication.schedule_info?.sync_attempt_count ?? 0} of 6</span>
                             </div>
+                          ))}
+                        </div>
+
+                        <div data-testid="analytics-status" data-state={state} className={`p-4 rounded-xl border space-y-2 ${tone}`}>
+                          <div className="text-xs font-semibold">{headline}</div>
+                          {reason && <p className="text-[11px]">{reason}</p>}
+                          {collected && <p className="text-[11px] font-mono">{collected}</p>}
+                          {syncError && (
+                            <p className="text-[11px] font-mono text-rose-300">
+                              Sync Metrics ({fmtDateTime(new Date().toISOString())}): {syncError}
+                            </p>
+                          )}
+                          <div className="text-[11px] font-mono space-y-1 pt-1 text-slate-400">
+                            <div>Last attempt: {lastAttempt}</div>
+                            <div>Last successful Buffer response: {fmtDateTime(status?.last_buffer_response_at, "none")}</div>
+                            {status && !status.scheduler_running && status.next_sync_at && (
+                              <div className="text-amber-300" data-testid="analytics-scheduler-off">
+                                Automatic sync is OFF. Start the worker: <code>python -m app.scheduler</code>
+                              </div>
+                            )}
+                            {status?.network_retry_paused && (
+                              <div className="text-amber-300">
+                                Automatic retries paused after {status.network_failures_in_row} network failures in a row. Use Sync Metrics to try again.
+                              </div>
+                            )}
+                            {!status?.network_retry_paused && status?.next_sync_at && (
+                              <div data-testid="analytics-next-sync">
+                                {status.next_sync_overdue
+                                  ? `Overdue since ${fmtDateTime(status.next_sync_at)}`
+                                  : `Next sync ${fmtDateTime(status.next_sync_at)}`}
+                                {` · Attempt ${attemptNo} of 6`}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
 
                         {/* Manual Metrics Entry Bar / Form (CP-1.5) */}
                         <div className="pt-2 border-t border-slate-800/60 flex flex-col space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-slate-400">
-                              Have real metrics directly from LinkedIn?
-                            </span>
-                            <button
-                              onClick={() => setShowManualMetricsForm(!showManualMetricsForm)}
-                              className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition underline"
-                            >
-                              {showManualMetricsForm ? "Cancel manual entry" : "Enter metrics from LinkedIn"}
-                            </button>
-                          </div>
-
                           {showManualMetricsForm && (
                             <div className="p-4 rounded-lg bg-slate-950/80 border border-slate-800 space-y-3">
                               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
@@ -796,12 +770,20 @@ export default function WorkflowRunDetailPage({
                         </div>
 
                         {/* Historical Snapshots Table */}
-                        {analyticsSnapshots && analyticsSnapshots.length > 0 && (
+                        {allSnapshots.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-slate-800/60">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-[11px] font-semibold text-slate-400">
-                                Historical Snapshots ({analyticsSnapshots.length})
+                                Historical Snapshots ({visibleSnapshots.length})
                               </span>
+                              {hiddenCount > 0 && (
+                                <button
+                                  onClick={() => setShowInvalidRows(!showInvalidRows)}
+                                  className="text-[10px] text-slate-400 hover:text-slate-200 underline"
+                                >
+                                  {showInvalidRows ? "Hide test / invalid rows" : `Show test / invalid rows (${hiddenCount})`}
+                                </button>
+                              )}
                               {isAnalyticsLoading && (
                                 <span className="text-[10px] text-slate-500 animate-pulse">Refreshing...</span>
                               )}
@@ -821,7 +803,7 @@ export default function WorkflowRunDetailPage({
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50 font-mono text-[11px]">
-                                  {analyticsSnapshots.map((snap) => {
+                                  {visibleSnapshots.map((snap) => {
                                     const isQuarantined = !!snap.metrics.invalid_reason;
                                     const isStub = !!snap.metrics.is_stub;
                                     return (

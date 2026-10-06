@@ -234,8 +234,31 @@ export interface PublicationResponse {
   schedule_info?: {
     last_synced_at?: string | null;
     next_sync_at?: string | null;
+    next_sync_overdue?: boolean;
     sync_attempt_count?: number;
+    attempt_number?: number;
+    network_retry_paused?: boolean;
+    scheduler_running?: boolean;
   };
+  analytics_status?: AnalyticsStatus | null;
+}
+
+/** One status per publication, derived by the backend from the most recent attempt. */
+export interface AnalyticsStatus {
+  state: "available" | "manual" | "not_collected_yet" | "network_error" | "failed" | "none";
+  last_attempt_at: string | null;
+  last_attempt_outcome: string | null;
+  last_attempt_source: "scheduler" | "manual" | null;
+  last_attempt_message: string | null;
+  last_attempt_technical: string | null;
+  last_buffer_response_at: string | null;
+  attempt_number: number;
+  network_failures_in_row: number;
+  network_retry_paused: boolean;
+  next_sync_at: string | null;
+  next_sync_overdue: boolean;
+  scheduler_running: boolean;
+  valid_snapshot: { id: string; collected_at: string; provider: string | null } | null;
 }
 
 export async function fetchWorkflowRunPublication(id: string): Promise<PublicationResponse> {
@@ -462,7 +485,12 @@ export async function syncPublicationAnalytics(publicationId: string): Promise<A
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.detail || "Failed to sync publication analytics");
+    // Network failures arrive as { state, message, technical }; other errors as a string.
+    const detail = data.detail;
+    const message = typeof detail === "string" ? detail : detail?.message || "Failed to sync publication analytics";
+    const error = new Error(message) as Error & { detail?: any };
+    error.detail = detail;
+    throw error;
   }
   return data;
 }
