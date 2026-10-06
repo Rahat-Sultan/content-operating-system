@@ -25,10 +25,10 @@ def _is_test_post(external_id: str | None) -> bool:
     return bool(external_id) and external_id.startswith(TEST_ID_PREFIXES)
 
 
-def build_summary(db: Session, include_test: bool = False, platform: str | None = None) -> dict[str, Any]:
+def build_summary(db: Session, include_test: bool = False, platform: str | None = None, owner_id=None) -> dict[str, Any]:
     pubs = (
         db.query(Publication)
-        .filter(Publication.status == PublicationStatus.PUBLISHED)
+        .filter(Publication.status == PublicationStatus.PUBLISHED, Publication.owner_id == owner_id)
         .order_by(Publication.published_at.desc().nulls_last(), Publication.created_at.desc())
         .all()
     )
@@ -94,7 +94,7 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
 
     known = [p["key"] for p in PLATFORMS]
     from app.platform_settings.service import platform_views
-    ready = {v["key"]: v["ready"] for v in platform_views(db)}
+    ready = {v["key"]: v["ready"] for v in platform_views(db, owner_id)}
     breakdown = []
     for info in PLATFORMS:
         key = info["key"]

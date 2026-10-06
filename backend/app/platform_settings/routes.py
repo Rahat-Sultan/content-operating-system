@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.platform_settings.service import platform_views, test_platform, update_platform
 
-from app.settings_security.deps import settings_session
+from app.accounts.models import User
+from app.accounts.service import current_user
 
-router = APIRouter(prefix="/settings/platforms", tags=["settings"], dependencies=[Depends(settings_session)])
+router = APIRouter(prefix="/settings/platforms", tags=["settings"])
 
 
 class PlatformSettingsIn(BaseModel):
@@ -20,16 +21,16 @@ class PlatformSettingsIn(BaseModel):
 
 
 @router.get("")
-def list_platform_settings(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
-    return platform_views(db)
+def list_platform_settings(db: Session = Depends(get_db), user: User = Depends(current_user)) -> list[dict[str, Any]]:
+    return platform_views(db, user.id)
 
 
 @router.put("/{key}")
-def save_platform_settings(key: str, body: PlatformSettingsIn, db: Session = Depends(get_db)) -> dict[str, Any]:
-    return update_platform(db, key, body.model_dump())
+def save_platform_settings(key: str, body: PlatformSettingsIn, db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict[str, Any]:
+    return update_platform(db, user.id, key, body.model_dump())
 
 
 @router.post("/{key}/test")
-def test_platform_connection(key: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+def test_platform_connection(key: str, db: Session = Depends(get_db), user: User = Depends(current_user)) -> dict[str, Any]:
     """Read-only check. Never publishes."""
-    return test_platform(db, key)
+    return test_platform(db, user.id, key)

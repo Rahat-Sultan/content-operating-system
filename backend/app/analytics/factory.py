@@ -1,5 +1,6 @@
 import logging
 from app.config import settings
+from app.accounts.context import active_key
 from app.analytics.interface import AnalyticsProvider
 from app.analytics.local_provider import LocalTestAnalyticsProvider
 from app.analytics.buffer_provider import BufferAnalyticsProvider
@@ -8,7 +9,6 @@ from app.publishing.buffer_provider import is_placeholder_buffer_token
 logger = logging.getLogger(__name__)
 
 _default_local_analytics = LocalTestAnalyticsProvider()
-_default_buffer_analytics: BufferAnalyticsProvider | None = None
 
 
 def get_analytics_provider(provider_name: str | None = None) -> AnalyticsProvider:
@@ -27,7 +27,7 @@ def get_analytics_provider(provider_name: str | None = None) -> AnalyticsProvide
         return _default_local_analytics
 
     if selected == "buffer":
-        token = settings.buffer_access_token
+        token = active_key("BUFFER_ACCESS_TOKEN")
         if is_placeholder_buffer_token(token):
             logger.warning(
                 "\n"
@@ -38,10 +38,7 @@ def get_analytics_provider(provider_name: str | None = None) -> AnalyticsProvide
             )
             return _default_local_analytics
 
-        global _default_buffer_analytics
-        if _default_buffer_analytics is None:
-            _default_buffer_analytics = BufferAnalyticsProvider()
-        return _default_buffer_analytics
+        return BufferAnalyticsProvider()  # per call: each account's token is read when the provider is built
 
     logger.warning("Unknown analytics provider '%s', falling back to LocalTestAnalyticsProvider", selected)
     return _default_local_analytics

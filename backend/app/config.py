@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     media_public_base_url: str = ""
     # Fernet key that encrypts API keys saved from the Settings page. Required to save keys.
     settings_encryption_key: str = ""
+    # Google sign-in (OAuth 2.0). Both must be set to enable the Google option.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+    frontend_url: str = "http://localhost:3000"
 
 
 settings = Settings()

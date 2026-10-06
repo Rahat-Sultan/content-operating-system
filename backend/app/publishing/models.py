@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base
+from app.db import Base, OwnedMixin
 
 
 class PublicationStatus(str, PyEnum):
@@ -17,7 +17,7 @@ class PublicationStatus(str, PyEnum):
     FAILED = "FAILED"
 
 
-class Publication(Base):
+class Publication(OwnedMixin, Base):
     """
     Publication record for a content version to a platform.
     idempotency_key (UNIQUE) prevents duplicate publications caused by retries.

@@ -2,6 +2,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.accounts.models import User
+from app.accounts.service import current_user
 from app.db import get_db
 from app.publishing.models import Publication
 from app.analytics.models import Analytics
@@ -15,11 +17,12 @@ router = APIRouter(prefix="/publications", tags=["publications"])
 def get_publication(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Get publication record by ID.
     """
-    publication = db.query(Publication).filter(Publication.id == id).first()
+    publication = db.query(Publication).filter(Publication.id == id, Publication.owner_id == user.id).first()
     if not publication:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -32,12 +35,13 @@ def get_publication(
 def get_publication_analytics(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Get analytics performance snapshots for a publication by publication ID.
     Returns all historical snapshots, ordered by collection time descending.
     """
-    publication = db.query(Publication).filter(Publication.id == id).first()
+    publication = db.query(Publication).filter(Publication.id == id, Publication.owner_id == user.id).first()
     if not publication:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -57,6 +61,7 @@ def get_publication_analytics(
 def sync_publication_analytics_endpoint(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Manually triggers analytics sync for a published post.
@@ -65,6 +70,8 @@ def sync_publication_analytics_endpoint(
     from app.analytics.service import sync_publication_metrics
     from app.analytics.status import record_manual_sync_attempt
 
+    from app.accounts.context import set_current_owner
+    set_current_owner(user.id)
     try:
         snapshot = sync_publication_metrics(db=db, publication_id=id)
     except HTTPException as exc:
@@ -88,12 +95,13 @@ def add_manual_analytics_endpoint(
     id: UUID,
     data: ManualMetricsInput,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     CP-1.5: Records a manual snapshot for a publication with provider='manual'.
     Non-negative integers validated by schema.
     """
-    pub = db.query(Publication).filter(Publication.id == id).first()
+    pub = db.query(Publication).filter(Publication.id == id, Publication.owner_id == user.id).first()
     if not pub:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

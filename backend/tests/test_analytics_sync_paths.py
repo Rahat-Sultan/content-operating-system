@@ -21,7 +21,7 @@ from app.analytics.interface import (
 )
 from app.analytics.service import sync_publication_metrics
 
-from tests.test_publishing_concurrency import seed_test_workflow_tree
+from tests.test_publishing_concurrency import test_owner_id, seed_test_workflow_tree
 
 class TestAnalyticsSyncPaths(unittest.TestCase):
     def setUp(self):
@@ -34,6 +34,7 @@ class TestAnalyticsSyncPaths(unittest.TestCase):
 
         # Create a test publication
         self.pub = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             content_version_id=self.version.id,
             platform="linkedin",

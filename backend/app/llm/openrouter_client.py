@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.accounts.context import active_key
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ def is_placeholder_key(key: str | None) -> bool:
 
 def check_api_key_configuration(operation_name: str = "LLM Generation") -> bool:
     """Explicitly check and warn loudly if OpenRouter API key is missing or placeholder."""
-    key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
+    key = active_key("OPENROUTER_API_KEY") or ""
     if is_placeholder_key(key):
         logger.warning(
             "\n"
@@ -166,7 +167,7 @@ def execute_llm_completion(
     If all models fail or key is invalid:
     Raises the most informative classified OpenRouterError describing all attempted models and failures.
     """
-    api_key = settings.openrouter_api_key or os.getenv("OPENROUTER_API_KEY", "")
+    api_key = active_key("OPENROUTER_API_KEY") or ""
     if is_placeholder_key(api_key):
         check_api_key_configuration(operation_name)
         raise OpenRouterAuthError(

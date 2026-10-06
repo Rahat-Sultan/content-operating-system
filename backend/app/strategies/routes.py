@@ -2,6 +2,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from app.accounts.models import User
+from app.accounts.service import current_user
 from app.db import get_db
 from app.strategies.schemas import (
     CreateStrategyRequest,
@@ -55,12 +57,12 @@ def get_all_strategies(
     enabled_only: bool = Query(False, description="Filter to enabled strategies only"),
     archived: bool = Query(False, description="True lists the archive (Rejected section) instead"),
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
-    List content strategies. Archived strategies are hidden unless archived=true.
+    List this account's content strategies. Archived strategies are hidden unless archived=true.
     """
-    from app.strategies.models import ContentStrategy
-    strategies = list_strategies(db, enabled_only=enabled_only)
+    strategies = list_strategies(db, enabled_only=enabled_only, owner_id=user.id)
     strategies = [s for s in strategies if (s.archived_at is not None) == archived]
     result = []
     for strat in strategies:
@@ -73,6 +75,7 @@ def get_all_strategies(
 def create_new_strategy(
     request: CreateStrategyRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Create a new content strategy with niche configuration and optional source links.
@@ -84,6 +87,7 @@ def create_new_strategy(
         config=request.config,
         enabled=request.enabled,
         source_ids=request.source_ids,
+        owner_id=user.id,
     )
     sources = get_strategy_sources(db, strategy.id)
     return _to_strategy_response(strategy, sources, db=db)
@@ -93,11 +97,12 @@ def create_new_strategy(
 def get_single_strategy(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
-    Get strategy detail and associated sources by strategy ID.
+    Get strategy detail and associated sources by strategy ID. 404 for another account's strategy.
     """
-    strategy = get_strategy(db, id)
+    strategy = get_strategy(db, id, owner_id=user.id)
     sources = get_strategy_sources(db, strategy.id)
     return _to_strategy_response(strategy, sources, db=db)
 
@@ -107,6 +112,7 @@ def update_existing_strategy(
     id: UUID,
     request: UpdateStrategyRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Update editable configuration, enabled status, or associated sources for a strategy.
@@ -119,37 +125,42 @@ def update_existing_strategy(
         config=request.config,
         enabled=request.enabled,
         source_ids=request.source_ids,
+        owner_id=user.id,
     )
     sources = get_strategy_sources(db, strategy.id)
     return _to_strategy_response(strategy, sources, db=db)
 
 
 @router.post("/{id}/archive", status_code=status.HTTP_204_NO_CONTENT)
-def archive_strategy_endpoint(id: UUID, db: Session = Depends(get_db)):
+def archive_strategy_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     from app.ideas.lifecycle import archive_strategy
-    archive_strategy(db, id)
+    archive_strategy(db, id, user.id)
 
 
 @router.post("/{id}/restore", status_code=status.HTTP_204_NO_CONTENT)
-def restore_strategy_endpoint(id: UUID, db: Session = Depends(get_db)):
+def restore_strategy_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     from app.ideas.lifecycle import restore_strategy
-    restore_strategy(db, id)
+    restore_strategy(db, id, user.id)
 
 
 @router.delete("/{id}")
-def delete_strategy_endpoint(id: UUID, db: Session = Depends(get_db)):
+def delete_strategy_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Permanent. Refused (409) if the strategy has any workflow run. Archive instead."""
     from app.ideas.lifecycle import delete_strategy
-    return delete_strategy(db, id)
+    return delete_strategy(db, id, user.id)
 
 
 @router.post("/{id}/discover", response_model=StrategyDiscoveryResult)
 def trigger_strategy_discovery(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Triggers Discovery for this specific strategy:
     Ingests attached sources and runs scout+scoring producing new candidate Ideas.
     """
+    from app.accounts.context import set_current_owner
+    set_current_owner(user.id)
+    get_strategy(db, id, owner_id=user.id)  # 404 unless it is this account's strategy
     return run_strategy_discovery(db=db, strategy_id=id)

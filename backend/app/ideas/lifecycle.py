@@ -38,16 +38,16 @@ def add_new_idea_if_unique(db: Session, idea: Idea) -> bool:
     return True
 
 
-def archive_idea(db: Session, idea_id: UUID) -> Idea:
+def archive_idea(db: Session, idea_id: UUID, owner_id: UUID) -> Idea:
     # Atomic: only NEW or SELECTED ideas can be archived. In-progress or published ones cannot.
     updated = (
         db.query(Idea)
-        .filter(Idea.id == idea_id, Idea.status.in_([IdeaStatus.NEW, IdeaStatus.SELECTED]))
+        .filter(Idea.id == idea_id, Idea.owner_id == owner_id, Idea.status.in_([IdeaStatus.NEW, IdeaStatus.SELECTED]))
         .update({Idea.status: IdeaStatus.REJECTED}, synchronize_session=False)
     )
     if updated != 1:
         db.rollback()
-        current = db.query(Idea).filter(Idea.id == idea_id).first()
+        current = db.query(Idea).filter(Idea.id == idea_id, Idea.owner_id == owner_id).first()
         if current is None:
             raise HTTPException(status_code=404, detail=f"Idea {idea_id} not found.")
         raise HTTPException(status_code=409, detail=f"Idea is {current.status.value}; only NEW or SELECTED ideas can be archived.")
@@ -55,11 +55,11 @@ def archive_idea(db: Session, idea_id: UUID) -> Idea:
     return db.query(Idea).filter(Idea.id == idea_id).one()
 
 
-def restore_idea(db: Session, idea_id: UUID) -> Idea:
+def restore_idea(db: Session, idea_id: UUID, owner_id: UUID) -> Idea:
     try:
         updated = (
             db.query(Idea)
-            .filter(Idea.id == idea_id, Idea.status == IdeaStatus.REJECTED)
+            .filter(Idea.id == idea_id, Idea.owner_id == owner_id, Idea.status == IdeaStatus.REJECTED)
             .update({Idea.status: IdeaStatus.NEW}, synchronize_session=False)
         )
         db.commit()
@@ -71,8 +71,8 @@ def restore_idea(db: Session, idea_id: UUID) -> Idea:
     return db.query(Idea).filter(Idea.id == idea_id).one()
 
 
-def delete_idea(db: Session, idea_id: UUID) -> None:
-    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+def delete_idea(db: Session, idea_id: UUID, owner_id: UUID) -> None:
+    idea = db.query(Idea).filter(Idea.id == idea_id, Idea.owner_id == owner_id).first()
     if idea is None:
         raise HTTPException(status_code=404, detail=f"Idea {idea_id} not found.")
     runs = db.query(WorkflowRun).filter(WorkflowRun.idea_id == idea_id).count()
@@ -85,30 +85,30 @@ def delete_idea(db: Session, idea_id: UUID) -> None:
     db.commit()
 
 
-def archive_strategy(db: Session, strategy_id: UUID) -> None:
+def archive_strategy(db: Session, strategy_id: UUID, owner_id: UUID) -> None:
     result = db.execute(
-        text("UPDATE content_strategies SET archived_at = now() WHERE id = :id AND archived_at IS NULL"),
-        {"id": strategy_id},
+        text("UPDATE content_strategies SET archived_at = now() WHERE id = :id AND owner_id = :owner AND archived_at IS NULL"),
+        {"id": strategy_id, "owner": owner_id},
     )
     db.commit()
     if result.rowcount != 1:
         raise HTTPException(status_code=409, detail="Strategy is missing or already archived.")
 
 
-def restore_strategy(db: Session, strategy_id: UUID) -> None:
+def restore_strategy(db: Session, strategy_id: UUID, owner_id: UUID) -> None:
     result = db.execute(
-        text("UPDATE content_strategies SET archived_at = NULL WHERE id = :id AND archived_at IS NOT NULL"),
-        {"id": strategy_id},
+        text("UPDATE content_strategies SET archived_at = NULL WHERE id = :id AND owner_id = :owner AND archived_at IS NOT NULL"),
+        {"id": strategy_id, "owner": owner_id},
     )
     db.commit()
     if result.rowcount != 1:
         raise HTTPException(status_code=409, detail="Strategy is missing or not archived.")
 
 
-def delete_strategy(db: Session, strategy_id: UUID) -> dict:
+def delete_strategy(db: Session, strategy_id: UUID, owner_id: UUID) -> dict:
     """Deletes a strategy and its unrun ideas. Refused if any of its ideas has a workflow run."""
     from app.strategies.models import ContentStrategy
-    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id).first()
+    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id, ContentStrategy.owner_id == owner_id).first()
     if strategy is None:
         raise HTTPException(status_code=404, detail=f"Strategy {strategy_id} not found.")
     runs = (

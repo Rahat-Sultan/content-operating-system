@@ -1,4 +1,5 @@
 import unittest
+from tests.test_publishing_concurrency import test_owner_id
 from uuid import uuid4
 from datetime import datetime
 
@@ -23,6 +24,7 @@ class TestMediaAssetVersionSafety(unittest.TestCase):
         self.db = SessionLocal()
         # Create test strategy, idea, workflow_run, and content
         self.strategy = ContentStrategy(
+            owner_id=test_owner_id(),
             name="Media Test Strategy",
             config={"target_audience": "Engineers"},
             enabled=True,
@@ -31,6 +33,7 @@ class TestMediaAssetVersionSafety(unittest.TestCase):
         self.db.flush()
 
         self.idea = Idea(
+            owner_id=test_owner_id(),
             strategy_id=self.strategy.id,
             title="Media Test Idea",
             status=IdeaStatus.IN_PROGRESS,
@@ -40,6 +43,7 @@ class TestMediaAssetVersionSafety(unittest.TestCase):
         self.db.flush()
 
         self.workflow_run = WorkflowRun(
+            owner_id=test_owner_id(),
             idea_id=self.idea.id,
             strategy_id=self.strategy.id,
             status=WorkflowRunStatus.NEEDS_REVIEW,

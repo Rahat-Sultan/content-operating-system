@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base
+from app.db import Base, OwnedMixin
 
 # Association table — plain sa.Table, no mapped class, no relationships
 idea_source_items_table = Table(
@@ -34,7 +34,7 @@ idea_source_items_table = Table(
 )
 
 
-class Source(Base):
+class Source(OwnedMixin, Base):
     __tablename__ = "sources"
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)

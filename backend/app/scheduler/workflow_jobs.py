@@ -20,6 +20,7 @@ def enqueue_workflow_job(
     action: str,
     workflow_run_id: UUID,
     decision: dict[str, Any] | None = None,
+    owner_id: UUID | None = None,
 ) -> ScheduledJob:
     """Adds the job to the session. The caller commits, together with the state change."""
     if action not in ("start", "resume"):
@@ -29,6 +30,7 @@ def enqueue_workflow_job(
         payload["decision"] = decision
     job = ScheduledJob(
         id=uuid4(),
+        owner_id=owner_id,
         job_type=JobType.WORKFLOW_RUN,
         status=JobStatus.PENDING,
         scheduled_at=datetime.now(timezone.utc),

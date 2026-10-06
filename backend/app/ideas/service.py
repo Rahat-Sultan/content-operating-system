@@ -12,8 +12,11 @@ def list_ideas(
     status_filter: IdeaStatus | None = None,
     limit: int = 50,
     strategy_id: UUID | None = None,
+    owner_id=None,
 ) -> list[Idea]:
     query = db.query(Idea)
+    if owner_id is not None:
+        query = query.filter(Idea.owner_id == owner_id)
     if status_filter:
         query = query.filter(Idea.status == status_filter)
     if strategy_id:
@@ -24,8 +27,11 @@ def list_ideas(
     return query.limit(limit).all()
 
 
-def get_idea(db: Session, idea_id: UUID) -> Idea:
-    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+def get_idea(db: Session, idea_id: UUID, owner_id=None) -> Idea:
+    query = db.query(Idea).filter(Idea.id == idea_id)
+    if owner_id is not None:
+        query = query.filter(Idea.owner_id == owner_id)
+    idea = query.first()
     if not idea:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -34,9 +40,9 @@ def get_idea(db: Session, idea_id: UUID) -> Idea:
     return idea
 
 
-def get_idea_sources(db: Session, idea_id: UUID) -> list[SourceItem]:
-    # Confirm idea exists
-    get_idea(db, idea_id)
+def get_idea_sources(db: Session, idea_id: UUID, owner_id=None) -> list[SourceItem]:
+    # Confirm idea exists (and belongs to this account)
+    get_idea(db, idea_id, owner_id)
 
     # Join source_items through idea_source_items_table
     stmt = (

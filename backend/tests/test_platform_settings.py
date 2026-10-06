@@ -7,6 +7,7 @@ from fastapi import HTTPException
 
 from app.platform_settings import service
 from app.platform_settings.service import CHANNEL_ID_PATTERN, platform_views
+from tests.test_publishing_concurrency import test_owner_id
 
 
 class TestChannelIdValidation(unittest.TestCase):
@@ -22,9 +23,9 @@ class TestChannelIdValidation(unittest.TestCase):
 class TestReadiness(unittest.TestCase):
     def _views(self, token_ok, row):
         db = MagicMock()
-        db.query.return_value.all.return_value = [row] if row else []
+        db.query.return_value.filter.return_value.all.return_value = [row] if row else []
         with patch.object(service, "_buffer_token_configured", return_value=token_ok):
-            return {v["key"]: v for v in platform_views(db)}
+            return {v["key"]: v for v in platform_views(db, test_owner_id())}
 
     def test_no_token_means_needs_token(self):
         views = self._views(False, SimpleNamespace(key="linkedin", enabled=True, channel_id="abc", display_name=None, notes=None, updated_at=None))
@@ -51,15 +52,16 @@ class TestTestConnection(unittest.TestCase):
     def test_no_network_call_without_a_channel(self):
         db = MagicMock()
         with patch.object(service, "platform_views", return_value=[{"key": "linkedin", "label": "LinkedIn", "channel_id": None}]), \
+             patch.object(service, "key_for", return_value="test-key-value-0009"), \
              patch.object(service, "_buffer_token_configured", return_value=True), \
              patch("app.platform_settings.service.httpx.Client") as client:
-            result = service.test_platform(db, "linkedin")
+            result = service.test_platform(db, test_owner_id(), "linkedin")
         self.assertFalse(result["ok"])
         client.assert_not_called()
 
     def test_unknown_platform_is_404(self):
         with self.assertRaises(HTTPException):
-            service.update_platform(MagicMock(), "myspace", {})
+            service.update_platform(MagicMock(), test_owner_id(), "myspace", {})
 
 
 if __name__ == "__main__":

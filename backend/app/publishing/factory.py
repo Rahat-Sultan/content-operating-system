@@ -1,5 +1,6 @@
 import logging
 from app.config import settings
+from app.accounts.context import active_key
 from app.publishing.interface import PublisherInterface
 from app.publishing.local_provider import LocalTestPublisher
 from app.publishing.buffer_provider import BufferPublisher, is_placeholder_buffer_token
@@ -8,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 # Singleton instance of LocalTestPublisher for predictable testing / lifecycle
 _default_local_publisher = LocalTestPublisher()
-_default_buffer_publisher: BufferPublisher | None = None
 
 
 def get_publisher_provider(provider_name: str | None = None) -> PublisherInterface:
@@ -27,7 +27,7 @@ def get_publisher_provider(provider_name: str | None = None) -> PublisherInterfa
         return _default_local_publisher
 
     if selected == "buffer":
-        token = settings.buffer_access_token
+        token = active_key("BUFFER_ACCESS_TOKEN")
         if is_placeholder_buffer_token(token):
             logger.warning(
                 "\n"
@@ -39,10 +39,7 @@ def get_publisher_provider(provider_name: str | None = None) -> PublisherInterfa
             )
             return _default_local_publisher
 
-        global _default_buffer_publisher
-        if _default_buffer_publisher is None:
-            _default_buffer_publisher = BufferPublisher()
-        return _default_buffer_publisher
+        return BufferPublisher()  # per call: each account's token is read when the provider is built
 
     logger.warning("Unknown publisher provider '%s', falling back to LocalTestPublisher", selected)
     return _default_local_publisher

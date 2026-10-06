@@ -1,5 +1,6 @@
 import os
 import unittest
+from tests.test_publishing_concurrency import test_owner_id
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from unittest.mock import patch
@@ -25,6 +26,7 @@ class TestScheduledDiscoveryConcurrencyAndFailure(unittest.TestCase):
         self.src = src
 
         self.strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name=f"TEMP-schedule-conc-{uuid4().hex[:6]}",
             description="Throwaway strategy for CP-2A.3-5",
@@ -54,6 +56,7 @@ class TestScheduledDiscoveryConcurrencyAndFailure(unittest.TestCase):
         # Create one due PENDING job
         now = datetime.now(timezone.utc)
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.DISCOVERY,
             status=JobStatus.PENDING,
@@ -101,6 +104,7 @@ class TestScheduledDiscoveryConcurrencyAndFailure(unittest.TestCase):
         # Job claimed 10 minutes ago by dead worker
         crashed_time = datetime.now(timezone.utc) - timedelta(minutes=10)
         crashed_job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.DISCOVERY,
             status=JobStatus.RUNNING,
@@ -140,6 +144,7 @@ class TestScheduledDiscoveryConcurrencyAndFailure(unittest.TestCase):
         mock_rss.side_effect = ConnectionError("Feed unreachable: Connection timed out")
 
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.DISCOVERY,
             status=JobStatus.PENDING,
@@ -182,6 +187,7 @@ class TestScheduledDiscoveryConcurrencyAndFailure(unittest.TestCase):
         mock_llm.side_effect = RuntimeError("OpenRouter API error (HTTP 429): Rate limit reached. Window 60s.")
 
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.DISCOVERY,
             status=JobStatus.PENDING,

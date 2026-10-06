@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base
+from app.db import Base, OwnedMixin
 
 
 class WorkerHeartbeat(Base):
@@ -43,7 +43,7 @@ class JobStatus(str, enum.Enum):
     FAILED = "FAILED"
 
 
-class ScheduledJob(Base):
+class ScheduledJob(OwnedMixin, Base):
     """
     Durable PostgreSQL-backed job queue for scheduled discovery and analytics sync.
     Supports atomic multi-worker claiming via SELECT ... FOR UPDATE SKIP LOCKED

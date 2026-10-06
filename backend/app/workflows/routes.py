@@ -3,6 +3,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.accounts.models import User
+from app.accounts.service import current_user
 from app.db import get_db
 from app.workflows.schemas import (
     CreateWorkflowRunRequest,
@@ -33,12 +35,14 @@ router = APIRouter(prefix="/workflow-runs", tags=["workflow-runs"])
 def start_workflow_run(
     request: CreateWorkflowRunRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     # Queues a durable start job; the scheduler worker runs the graph.
     run = create_workflow_run(
         db=db,
         strategy_id=request.strategy_id,
         idea_id=request.idea_id,
+        owner_id=user.id,
     )
 
     return WorkflowRunResponse(
@@ -56,9 +60,10 @@ def start_workflow_run(
 @router.get("", response_model=list[WorkflowRunResponse])
 def list_workflow_runs(
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     from app.workflows.models import WorkflowRun
-    runs = db.query(WorkflowRun).order_by(WorkflowRun.created_at.desc()).limit(20).all()
+    runs = db.query(WorkflowRun).filter(WorkflowRun.owner_id == user.id).order_by(WorkflowRun.created_at.desc()).limit(20).all()
     return [
         WorkflowRunResponse(
             workflow_run_id=r.id,
@@ -77,8 +82,9 @@ def list_workflow_runs(
 def read_workflow_run(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
-    run = get_workflow_run(db, id)
+    run = get_workflow_run(db, id, owner_id=user.id)
     return WorkflowRunResponse(
         workflow_run_id=run.id,
         strategy_id=run.strategy_id,
@@ -96,6 +102,7 @@ def submit_approval_decision(
     id: UUID,
     request: ApprovalDecisionRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     # Atomic transaction: verify status == NEEDS_REVIEW, verify version lock, update status, insert approval row
     run, approval = process_approval_decision(
@@ -104,6 +111,7 @@ def submit_approval_decision(
         content_version_id=request.content_version_id,
         decision=request.decision,
         feedback=request.feedback,
+        owner_id=user.id,
     )
 
     # The resume job was queued atomically with the decision (process_approval_decision).
@@ -124,10 +132,10 @@ class DraftEditRequest(BaseModel):
 
 
 @router.post("/{id}/draft/versions", status_code=201)
-def save_draft_edit(id: UUID, request: DraftEditRequest, db: Session = Depends(get_db)):
+def save_draft_edit(id: UUID, request: DraftEditRequest, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Saves a human edit as a new version. Only while the run is NEEDS_REVIEW."""
     from app.workflows.service import create_human_edit_version
-    version = create_human_edit_version(db, id, request.title, request.body)
+    version = create_human_edit_version(db, id, request.title, request.body, owner_id=user.id)
     return {
         "content_version_id": str(version.id),
         "version_number": version.version_number,
@@ -139,7 +147,9 @@ def save_draft_edit(id: UUID, request: DraftEditRequest, db: Session = Depends(g
 def read_research(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
+    get_workflow_run(db, id, owner_id=user.id)
     research = get_research_for_workflow_run(db, id)
     return ResearchResponse(
         id=research.id,
@@ -155,7 +165,9 @@ def read_research(
 def read_content_brief(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
+    get_workflow_run(db, id, owner_id=user.id)
     brief = get_brief_for_workflow_run(db, id)
     return ContentBriefResponse(
         id=brief.id,
@@ -169,11 +181,13 @@ def read_content_brief(
 def read_content_draft(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     from app.strategies.models import ContentStrategy
     from app.workflows.models import WorkflowRun
     from app.workflows.draft_lint import lint_draft
 
+    get_workflow_run(db, id, owner_id=user.id)
     content, versions = get_draft_for_workflow_run(db, id)
     run = db.query(WorkflowRun).filter(WorkflowRun.id == id).first()
     voice_sample = None
@@ -233,10 +247,12 @@ def read_content_draft(
 def read_workflow_run_publication(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Get the publication record associated with this workflow run.
     """
+    get_workflow_run(db, id, owner_id=user.id)
     from app.content.models import Content, ContentVersion
     from app.publishing.models import Publication
     from fastapi import HTTPException, status

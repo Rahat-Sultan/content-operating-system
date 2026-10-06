@@ -32,7 +32,7 @@ from app.scheduler.service import (
     NETWORK_RETRY_LIMIT,
     get_publication_sync_schedule_info,
 )
-from tests.test_publishing_concurrency import seed_test_workflow_tree
+from tests.test_publishing_concurrency import test_owner_id, seed_test_workflow_tree
 from app.workflows.models import WorkflowRunStatus
 
 PUBLISHED_AT = datetime.now(timezone.utc) - timedelta(days=2)
@@ -48,6 +48,7 @@ class IsolatedDBTestCase(unittest.TestCase):
             self.db, run_status=WorkflowRunStatus.COMPLETED, approved=True
         )
         self.pub = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             content_version_id=version.id,
             platform="linkedin",
@@ -102,6 +103,7 @@ class TestNetworkErrorState(IsolatedDBTestCase):
     def test_network_failure_does_not_advance_attempt_counter(self):
         scheduler = JobScheduler(worker_id="test-net")
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.RUNNING,
@@ -129,6 +131,7 @@ class TestNetworkErrorState(IsolatedDBTestCase):
         scheduler = JobScheduler(worker_id="test-net")
         now = datetime.now(timezone.utc)
         failed = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.FAILED,
@@ -166,6 +169,7 @@ class TestNetworkErrorState(IsolatedDBTestCase):
         long_ago = datetime.now(timezone.utc) - timedelta(days=1)
         for i in range(NETWORK_RETRY_LIMIT):
             self.db.add(ScheduledJob(
+                owner_id=test_owner_id(),
                 id=uuid4(),
                 job_type=JobType.ANALYTICS_SYNC,
                 status=JobStatus.FAILED,
@@ -191,6 +195,7 @@ class TestNetworkErrorState(IsolatedDBTestCase):
     def test_status_reports_network_error_as_its_own_state(self):
         now = datetime.now(timezone.utc)
         self.db.add(ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.FAILED,

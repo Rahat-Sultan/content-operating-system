@@ -142,6 +142,7 @@ class JobScheduler:
 
             new_job = ScheduledJob(
                 id=uuid4(),
+                owner_id=strat.owner_id,
                 job_type=JobType.DISCOVERY,
                 status=JobStatus.PENDING,
                 strategy_id=strat.id,
@@ -228,6 +229,7 @@ class JobScheduler:
 
                 new_job = ScheduledJob(
                     id=uuid4(),
+                    owner_id=pub.owner_id,
                     job_type=JobType.ANALYTICS_SYNC,
                     status=JobStatus.PENDING,
                     publication_id=pub.id,
@@ -270,6 +272,15 @@ class JobScheduler:
         return job
 
     def execute_job(self, db: Session, job: ScheduledJob) -> bool:
+        """Runs a claimed job as the account that owns it, so its provider calls use that account's keys."""
+        from app.accounts.context import set_current_owner, reset_current_owner
+        token = set_current_owner(job.owner_id)
+        try:
+            return self._execute_job_body(db, job)
+        finally:
+            reset_current_owner(token)
+
+    def _execute_job_body(self, db: Session, job: ScheduledJob) -> bool:
         """
         Executes a claimed job and records result or error.
         """
@@ -402,8 +413,6 @@ class JobScheduler:
         db = SessionLocal()
         try:
             write_heartbeat(db, self.worker_id)
-            from app.settings_security.service import apply_saved_keys
-            apply_saved_keys(db)  # pick up keys changed in the Settings page
             self.recover_stale_claims(db)
             self.enqueue_due_discovery_jobs(db)
             self.enqueue_due_analytics_sync_jobs(db)

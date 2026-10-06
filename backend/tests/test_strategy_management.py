@@ -29,6 +29,7 @@ def test_strategy_crud():
     db = SessionLocal()
     src_id = uuid4()
     source_a = Source(
+        owner_id=test_owner_id(),
         id=src_id,
         name="Source Alpha",
         source_type="rss",
@@ -100,6 +101,7 @@ def test_strategy_isolation_and_discovery():
 
     # Create 2 distinct sources
     src_a = Source(
+        owner_id=test_owner_id(),
         id=uuid4(),
         name="Isolated Feed A",
         source_type="rss",
@@ -108,6 +110,7 @@ def test_strategy_isolation_and_discovery():
         config={},
     )
     src_b = Source(
+        owner_id=test_owner_id(),
         id=uuid4(),
         name="Isolated Feed B",
         source_type="rss",
@@ -120,6 +123,7 @@ def test_strategy_isolation_and_discovery():
 
     # Create Strategy A with src_a
     strat_a = ContentStrategy(
+        owner_id=test_owner_id(),
         id=uuid4(),
         name="Strategy AI Systems",
         description="AI infrastructure",
@@ -128,6 +132,7 @@ def test_strategy_isolation_and_discovery():
     )
     # Create Strategy B with src_b
     strat_b = ContentStrategy(
+        owner_id=test_owner_id(),
         id=uuid4(),
         name="Strategy Cybersecurity",
         description="Infosec defense",

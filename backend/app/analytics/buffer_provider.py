@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.accounts.context import active_key
 from app.analytics.interface import (
     AnalyticsProvider,
     AnalyticsRequest,
@@ -56,11 +57,7 @@ class BufferAnalyticsProvider(AnalyticsProvider):
     """
 
     def __init__(self, access_token: str | None = None, timeout: float = 20.0):
-        self.access_token = (
-            access_token
-            or settings.buffer_access_token
-            or os.getenv("BUFFER_ACCESS_TOKEN", "")
-        ).strip()
+        self.access_token = (access_token or active_key("BUFFER_ACCESS_TOKEN") or "").strip()
         self.timeout = timeout
 
     def _execute_graphql(self, query: str) -> dict[str, Any]:

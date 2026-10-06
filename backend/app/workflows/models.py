@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db import Base
+from app.db import Base, OwnedMixin
 
 
 class WorkflowRunStatus(str, PyEnum):
@@ -30,7 +30,7 @@ class WorkflowRunStatus(str, PyEnum):
     REJECTED = "REJECTED"
 
 
-class WorkflowRun(Base):
+class WorkflowRun(OwnedMixin, Base):
     """
     One production attempt for an Idea.
     WorkflowRun.id is passed directly as LangGraph thread_id — no separate thread_id column.

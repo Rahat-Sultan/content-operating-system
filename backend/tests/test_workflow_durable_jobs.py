@@ -26,7 +26,7 @@ from app.scheduler.service import JobScheduler
 from app.scheduler.workflow_jobs import claim_run_start, enqueue_workflow_job
 from app.workflows.models import WorkflowRun, WorkflowRunStatus
 from app.workflows.service import create_workflow_run
-from tests.test_publishing_concurrency import seed_test_workflow_tree
+from tests.test_publishing_concurrency import test_owner_id, seed_test_workflow_tree
 
 
 class IsolatedDB(unittest.TestCase):
@@ -56,7 +56,7 @@ class IsolatedDB(unittest.TestCase):
 class TestAtomicQueueing(IsolatedDB):
     def test_start_queues_run_and_job_together_as_pending(self):
         # The seeded run on this idea is COMPLETED, so a new run is allowed.
-        created = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id)
+        created = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id, owner_id=test_owner_id())
         self.assertEqual(created.status, WorkflowRunStatus.PENDING)
         jobs = self.workflow_jobs(created.id)
         self.assertEqual(len(jobs), 1)
@@ -64,10 +64,10 @@ class TestAtomicQueueing(IsolatedDB):
         self.assertEqual(jobs[0].payload["action"], "start")
 
     def test_second_start_for_active_idea_is_rejected_and_queues_nothing(self):
-        first = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id)
+        first = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id, owner_id=test_owner_id())
         before = self.db.query(ScheduledJob).filter(ScheduledJob.job_type == JobType.WORKFLOW_RUN).count()
         with self.assertRaises(HTTPException) as ctx:
-            create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id)
+            create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id, owner_id=test_owner_id())
         self.assertEqual(ctx.exception.status_code, 409)
         self.assertEqual(ctx.exception.detail["workflow_run_id"], str(first.id))
         after = self.db.query(ScheduledJob).filter(ScheduledJob.job_type == JobType.WORKFLOW_RUN).count()
@@ -80,14 +80,14 @@ class TestAtomicQueueing(IsolatedDB):
 
 class TestWorkerClaim(IsolatedDB):
     def test_claim_start_is_atomic_and_only_once(self):
-        run = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id)
+        run = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id, owner_id=test_owner_id())
         self.assertTrue(claim_run_start(self.db, run.id))
         self.assertFalse(claim_run_start(self.db, run.id))
         self.db.refresh(run)
         self.assertEqual(run.status, WorkflowRunStatus.RUNNING)
 
     def test_duplicate_start_job_does_not_run_the_graph_twice(self):
-        run = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id)
+        run = create_workflow_run(self.db, self.run.strategy_id, self.run.idea_id, owner_id=test_owner_id())
         scheduler = JobScheduler(worker_id="test-workflow")
         with patch("app.scheduler.service.SessionLocal", side_effect=self.session_factory), \
              patch("app.graph.content_graph.run_workflow_graph_background") as graph:
@@ -112,6 +112,7 @@ class TestLeaseRenewal(IsolatedDB):
     def test_renewal_moves_claimed_at_forward_for_the_owning_worker_only(self):
         old = datetime.now(timezone.utc) - timedelta(minutes=10)
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(), job_type=JobType.WORKFLOW_RUN, status=JobStatus.RUNNING,
             scheduled_at=old, claimed_at=old, claimed_by="owner-worker", payload={"action": "start"},
         )

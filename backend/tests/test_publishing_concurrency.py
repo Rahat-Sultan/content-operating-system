@@ -35,6 +35,29 @@ def get_raw_pg_conn():
     return psycopg.connect(conn_str)
 
 
+TEST_OWNER_EMAIL = "test-owner@example.test"
+
+
+def test_owner_id():
+    """
+    The account every test row belongs to. Created once; it is a test account only
+    (email on example.test) and can be deleted from the users table at any time.
+    """
+    from app.accounts.models import User
+    from app.db import SessionLocal
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == TEST_OWNER_EMAIL).first()
+        if user is None:
+            user = User(id=uuid4(), email=TEST_OWNER_EMAIL, display_name="Test owner",
+                        password_hash=None, auth_provider="local")
+            db.add(user)
+            db.commit()
+        return user.id
+    finally:
+        db.close()
+
+
 def seed_test_workflow_tree(db: Session, run_status: WorkflowRunStatus = WorkflowRunStatus.RUNNING, approved: bool = True):
     """
     Creates a full isolated test tree: Strategy -> Idea -> WorkflowRun -> Content -> ContentVersion (v1) -> Approval.
@@ -42,15 +65,16 @@ def seed_test_workflow_tree(db: Session, run_status: WorkflowRunStatus = Workflo
     # 1. Strategy & Idea via raw SQL or db query
     conn = get_raw_pg_conn()
     cur = conn.cursor()
+    owner = test_owner_id()
     strat_id = uuid4()
     cur.execute(
-        "INSERT INTO content_strategies (id, name, description, config, enabled) VALUES (%s, %s, %s, %s, true)",
-        (strat_id, f"Test Strat {strat_id.hex[:6]}", "Testing", "{}"),
+        "INSERT INTO content_strategies (id, owner_id, name, description, config, enabled) VALUES (%s, %s, %s, %s, %s, true)",
+        (strat_id, owner, f"Test Strat {strat_id.hex[:6]}", "Testing", "{}"),
     )
     idea_id = uuid4()
     cur.execute(
-        "INSERT INTO ideas (id, strategy_id, title, status, scoring_metadata) VALUES (%s, %s, %s, %s, %s)",
-        (idea_id, strat_id, f"Test Idea {idea_id.hex[:6]}", "SELECTED", "{}"),
+        "INSERT INTO ideas (id, owner_id, strategy_id, title, status, scoring_metadata) VALUES (%s, %s, %s, %s, %s, %s)",
+        (idea_id, owner, strat_id, f"Test Idea {idea_id.hex[:6]}", "SELECTED", "{}"),
     )
     conn.commit()
     cur.close()
@@ -59,6 +83,7 @@ def seed_test_workflow_tree(db: Session, run_status: WorkflowRunStatus = Workflo
     # 2. WorkflowRun
     run = WorkflowRun(
         id=uuid4(),
+        owner_id=test_owner_id(),
         idea_id=idea_id,
         strategy_id=strat_id,
         status=run_status,

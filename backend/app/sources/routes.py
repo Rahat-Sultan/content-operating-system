@@ -4,6 +4,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.accounts.models import User
+from app.accounts.service import current_user
 from app.db import get_db
 from app.sources.schemas import CreateSourceRequest, UpdateSourceRequest, SourceResponse
 from app.sources.service import sync_source, get_source, create_source, update_source
@@ -15,26 +17,31 @@ router = APIRouter(prefix="/sources", tags=["sources"])
 def sync_source_endpoint(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ) -> dict[str, Any]:
     """
     Triggers deterministic ingestion & deduplication for an RSS source,
     followed by scout & structured scoring for newly ingested items.
     """
-    return sync_source(db=db, source_id=id)
+    from app.accounts.context import set_current_owner
+    set_current_owner(user.id)
+    return sync_source(db=db, source_id=id, owner_id=user.id)
 
 
 @router.get("", response_model=list[SourceResponse])
 def list_sources_endpoint(
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     from app.sources.models import Source
-    return db.query(Source).order_by(Source.created_at.desc()).all()
+    return db.query(Source).filter(Source.owner_id == user.id).order_by(Source.created_at.desc()).all()
 
 
 @router.post("", response_model=SourceResponse, status_code=status.HTTP_201_CREATED)
 def create_source_endpoint(
     request: CreateSourceRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     """
     Create a new content source (e.g. RSS feed).
@@ -47,6 +54,7 @@ def create_source_endpoint(
             url=request.url,
             enabled=request.enabled,
             config=request.config,
+            owner_id=user.id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -56,8 +64,9 @@ def create_source_endpoint(
 def get_source_endpoint(
     id: UUID,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
-    return get_source(db=db, source_id=id)
+    return get_source(db=db, source_id=id, owner_id=user.id)
 
 
 @router.patch("/{id}", response_model=SourceResponse)
@@ -65,10 +74,12 @@ def update_source_endpoint(
     id: UUID,
     request: UpdateSourceRequest,
     db: Session = Depends(get_db),
+    user: User = Depends(current_user),
 ):
     return update_source(
         db=db,
         source_id=id,
+        owner_id=user.id,
         name=request.name,
         source_type=request.source_type,
         url=request.url,

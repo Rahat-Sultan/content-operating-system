@@ -6,7 +6,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base
+from app.db import Base, OwnedMixin
 
 
 class IdeaStatus(str, PyEnum):
@@ -19,7 +19,7 @@ class IdeaStatus(str, PyEnum):
     EXPIRED = "EXPIRED"
 
 
-class Idea(Base):
+class Idea(OwnedMixin, Base):
     __tablename__ = "ideas"
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)

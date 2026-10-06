@@ -15,8 +15,11 @@ from app.ideas.scout_provider import execute_scout_and_score
 logger = logging.getLogger(__name__)
 
 
-def get_source(db: Session, source_id: UUID) -> Source:
-    source = db.query(Source).filter(Source.id == source_id).first()
+def get_source(db: Session, source_id: UUID, owner_id=None) -> Source:
+    query = db.query(Source).filter(Source.id == source_id)
+    if owner_id is not None:
+        query = query.filter(Source.owner_id == owner_id)
+    source = query.first()
     if not source:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -46,9 +49,11 @@ def create_source(
     url: str | None = None,
     enabled: bool = True,
     config: dict[str, Any] | None = None,
+    owner_id=None,
 ) -> Source:
     source = Source(
         id=uuid4(),
+        owner_id=owner_id,
         name=source_name_for(name, url),
         source_type=source_type,
         url=url,
@@ -64,13 +69,14 @@ def create_source(
 def update_source(
     db: Session,
     source_id: UUID,
+    owner_id=None,
     name: str | None = None,
     source_type: str | None = None,
     url: str | None = None,
     enabled: bool | None = None,
     config: dict[str, Any] | None = None,
 ) -> Source:
-    source = get_source(db, source_id)
+    source = get_source(db, source_id, owner_id)
     auto_named = source.name == (source.url or "")  # named after its link
     if url is not None:
         if auto_named:
@@ -91,7 +97,7 @@ def update_source(
     return source
 
 
-def sync_source(db: Session, source_id: UUID) -> dict[str, Any]:
+def sync_source(db: Session, source_id: UUID, owner_id=None) -> dict[str, Any]:
     """
     Ingests source items from a configured source, deduplicates them against source_items,
     triggers scout & scoring for new items against linked strategies, and persists ideas.
@@ -99,7 +105,7 @@ def sync_source(db: Session, source_id: UUID) -> dict[str, Any]:
     Deterministic code controls fetching, deduplication, and persistence.
     LLM/Evaluator handles synthesis and scoring.
     """
-    source = get_source(db, source_id)
+    source = get_source(db, source_id, owner_id)
     if not source.enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -201,6 +207,7 @@ def sync_source(db: Session, source_id: UUID) -> dict[str, Any]:
             for idea_dict in scored_ideas:
                 idea = Idea(
                     id=uuid4(),
+                    owner_id=strat.owner_id,
                     strategy_id=strat.id,
                     title=idea_dict["title"],
                     description=idea_dict["description"],

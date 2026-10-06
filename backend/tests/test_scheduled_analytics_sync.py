@@ -20,7 +20,7 @@ from app.analytics.interface import (
 )
 from app.scheduler.models import ScheduledJob, JobType, JobStatus
 from app.scheduler.service import JobScheduler
-from tests.test_publishing_concurrency import seed_test_workflow_tree
+from tests.test_publishing_concurrency import test_owner_id, seed_test_workflow_tree
 
 class TestScheduledAnalyticsSync(unittest.TestCase):
     def setUp(self):
@@ -38,6 +38,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
 
         # Published 30 days ago so scheduled_at is earlier than other publications
         self.pub = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             content_version_id=self.version.id,
             platform="linkedin",
@@ -117,6 +118,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
         """
         scheduler = JobScheduler(worker_id="worker-analytics-notready-test")
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.PENDING,
@@ -151,6 +153,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
         CP-2B.3: Two workers attempt to claim the same due analytics sync job. Exactly one executes.
         """
         job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.PENDING,
@@ -182,6 +185,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
         """
         old_time = datetime.now(timezone.utc) - timedelta(minutes=10)
         crashed_job = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.RUNNING,
@@ -220,6 +224,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
         # Create 5 completed jobs for self.pub
         for i in range(5):
             j = ScheduledJob(
+                owner_id=test_owner_id(),
                 id=uuid4(),
                 job_type=JobType.ANALYTICS_SYNC,
                 status=JobStatus.COMPLETED,
@@ -240,6 +245,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
 
         # Now add 6th completed job (total 6 attempts, which is max len(ANALYTICS_BACKOFF_MINUTES))
         j6 = ScheduledJob(
+            owner_id=test_owner_id(),
             id=uuid4(),
             job_type=JobType.ANALYTICS_SYNC,
             status=JobStatus.COMPLETED,
@@ -259,6 +265,7 @@ class TestScheduledAnalyticsSync(unittest.TestCase):
 
         # Unsupported publication (e.g. stub_ or linkedin_ mock external_id)
         mock_pub = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             content_version_id=self.version.id,
             platform="linkedin",

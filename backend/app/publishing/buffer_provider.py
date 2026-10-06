@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.accounts.context import active_key
 from app.publishing.interface import (
     AmbiguousTimeoutPublishingError,
     PermanentPublishingError,
@@ -48,11 +49,8 @@ class BufferPublisher(PublisherInterface):
         organization_id: str | None = None,
         timeout: float = 30.0,
     ):
-        self.access_token = (
-            access_token
-            or settings.buffer_access_token
-            or os.getenv("BUFFER_ACCESS_TOKEN", "")
-        ).strip()
+        # The owner's own Buffer token; falls back to the installation default in .env.
+        self.access_token = (access_token or active_key("BUFFER_ACCESS_TOKEN") or "").strip()
         self.channel_id = (
             channel_id
             or settings.buffer_profile_id

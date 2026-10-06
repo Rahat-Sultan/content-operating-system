@@ -142,8 +142,11 @@ class PublishingService:
         else:
             # Create new Publication row in PENDING/PUBLISHING status
             pub_id = uuid4()
+            from app.workflows.models import WorkflowRun as _Run
+            run_owner = db.query(_Run.owner_id).filter(_Run.id == workflow_run_id).scalar()
             publication = Publication(
                 id=pub_id,
+                owner_id=run_owner,
                 content_version_id=content_version_id,
                 platform=platform,
                 status=PublicationStatus.PUBLISHING,

@@ -15,15 +15,20 @@ from app.ideas.scout_provider import execute_scout_and_score
 logger = logging.getLogger(__name__)
 
 
-def list_strategies(db: Session, enabled_only: bool = False) -> list[ContentStrategy]:
+def list_strategies(db: Session, enabled_only: bool = False, owner_id=None) -> list[ContentStrategy]:
     query = db.query(ContentStrategy)
+    if owner_id is not None:
+        query = query.filter(ContentStrategy.owner_id == owner_id)
     if enabled_only:
         query = query.filter(ContentStrategy.enabled.is_(True))
     return query.order_by(ContentStrategy.created_at.desc()).all()
 
 
-def get_strategy(db: Session, strategy_id: UUID) -> ContentStrategy:
-    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id).first()
+def get_strategy(db: Session, strategy_id: UUID, owner_id=None) -> ContentStrategy:
+    query = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id)
+    if owner_id is not None:
+        query = query.filter(ContentStrategy.owner_id == owner_id)
+    strategy = query.first()
     if not strategy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -73,9 +78,11 @@ def create_strategy(
     config: dict[str, Any] | None = None,
     enabled: bool = True,
     source_ids: list[UUID] | None = None,
+    owner_id=None,
 ) -> ContentStrategy:
     strategy = ContentStrategy(
         id=uuid4(),
+        owner_id=owner_id,
         name=name,
         description=description,
         config=config or {},
@@ -100,8 +107,9 @@ def update_strategy(
     config: dict[str, Any] | None = None,
     enabled: bool | None = None,
     source_ids: list[UUID] | None = None,
+    owner_id=None,
 ) -> ContentStrategy:
-    strategy = get_strategy(db, strategy_id)
+    strategy = get_strategy(db, strategy_id, owner_id)
 
     if name is not None:
         strategy.name = name
@@ -229,6 +237,7 @@ def run_strategy_discovery(
             for idea_dict in scored_ideas:
                 idea = Idea(
                     id=uuid4(),
+                    owner_id=strategy.owner_id,
                     strategy_id=strategy.id,
                     title=idea_dict["title"],
                     description=idea_dict["description"],

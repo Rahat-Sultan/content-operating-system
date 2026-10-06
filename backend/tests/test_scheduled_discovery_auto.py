@@ -1,5 +1,6 @@
 import os
 import unittest
+from tests.test_publishing_concurrency import test_owner_id
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
@@ -25,6 +26,7 @@ class TestScheduledDiscoveryAutomatic(unittest.TestCase):
         self.assertIsNotNone(src, "No active source found")
 
         self.strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name=f"TEMP-schedule-test-{uuid4().hex[:6]}",
             description="Throwaway strategy for CP-2A.2",

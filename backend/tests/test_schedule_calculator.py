@@ -1,5 +1,6 @@
 import os
 import unittest
+from tests.test_publishing_concurrency import test_owner_id
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from app.scheduler.schedule_calculator import (
 class TestScheduleCalculations(unittest.TestCase):
     def test_discovery_due_never_run(self):
         strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name="Test Strat",
             config={"discovery_interval_hours": 4},
@@ -24,6 +26,7 @@ class TestScheduleCalculations(unittest.TestCase):
 
     def test_discovery_due_disabled_strategy(self):
         strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name="Test Strat",
             config={"discovery_interval_hours": 4},
@@ -33,6 +36,7 @@ class TestScheduleCalculations(unittest.TestCase):
 
     def test_discovery_due_no_interval_configured(self):
         strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name="Test Strat",
             config={},
@@ -43,6 +47,7 @@ class TestScheduleCalculations(unittest.TestCase):
     def test_discovery_due_ran_recently(self):
         now = datetime.now(timezone.utc)
         strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name="Test Strat",
             config={"discovery_interval_hours": 4},
@@ -54,6 +59,7 @@ class TestScheduleCalculations(unittest.TestCase):
     def test_discovery_due_overdue(self):
         now = datetime.now(timezone.utc)
         strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name="Test Strat",
             config={"discovery_interval_hours": 4},
@@ -66,6 +72,7 @@ class TestScheduleCalculations(unittest.TestCase):
         # Even if config specifies 0.1 hours, default min interval is 1.0 hour
         now = datetime.now(timezone.utc)
         strat = ContentStrategy(
+            owner_id=test_owner_id(),
             id=uuid4(),
             name="Test Strat",
             config={"discovery_interval_hours": 0.1},
@@ -77,6 +84,7 @@ class TestScheduleCalculations(unittest.TestCase):
     def test_analytics_sync_backoff_schedule(self):
         base_time = datetime(2026, 10, 5, 12, 0, 0, tzinfo=timezone.utc)
         pub = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             status=PublicationStatus.PUBLISHED,
             external_id="ext-12345",
@@ -102,7 +110,7 @@ class TestScheduleCalculations(unittest.TestCase):
 
     def test_daily_polling_stops_after_the_window(self):
         published = datetime.now(timezone.utc) - timedelta(days=31)
-        pub = Publication(id=uuid4(), status=PublicationStatus.PUBLISHED,
+        pub = Publication(owner_id=test_owner_id(), id=uuid4(), status=PublicationStatus.PUBLISHED,
                           external_id="6ac3541363761da98b71e85b", published_at=published)
         last = published + timedelta(days=29, hours=20)
         self.assertIsNone(get_next_analytics_sync_time(pub, 9, last_attempt_time=last))
@@ -114,6 +122,7 @@ class TestScheduleCalculations(unittest.TestCase):
 
     def test_analytics_sync_skips_non_published_or_missing_id(self):
         pub_pending = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             status=PublicationStatus.PENDING,
             external_id="ext-123",
@@ -121,6 +130,7 @@ class TestScheduleCalculations(unittest.TestCase):
         self.assertIsNone(get_next_analytics_sync_time(pub_pending, 0))
 
         pub_no_ext = Publication(
+            owner_id=test_owner_id(),
             id=uuid4(),
             status=PublicationStatus.PUBLISHED,
             external_id=None,
@@ -131,6 +141,7 @@ class TestScheduleCalculations(unittest.TestCase):
         # Local-test and invalid ids are never sent to Buffer.
         for ext in ("linkedin_abc123", "test-ext-1", "stub_9", "buffer_idea_6abf35338a74c61099923dab"):
             pub = Publication(
+                owner_id=test_owner_id(),
                 id=uuid4(),
                 status=PublicationStatus.PUBLISHED,
                 external_id=ext,

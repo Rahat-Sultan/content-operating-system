@@ -23,8 +23,11 @@ ACTIVE_STATUSES = [
 ]
 
 
-def get_workflow_run(db: Session, run_id: UUID) -> WorkflowRun:
-    run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
+def get_workflow_run(db: Session, run_id: UUID, owner_id=None) -> WorkflowRun:
+    query = db.query(WorkflowRun).filter(WorkflowRun.id == run_id)
+    if owner_id is not None:
+        query = query.filter(WorkflowRun.owner_id == owner_id)
+    run = query.first()
     if not run:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -37,16 +40,17 @@ def create_workflow_run(
     db: Session,
     strategy_id: UUID,
     idea_id: UUID,
+    owner_id=None,
 ) -> WorkflowRun:
     # 1. Validate strategy and idea exist
-    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id).first()
+    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id, ContentStrategy.owner_id == owner_id).first()
     if not strategy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Strategy {strategy_id} not found."
         )
 
-    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    idea = db.query(Idea).filter(Idea.id == idea_id, Idea.owner_id == owner_id).first()
     if not idea:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,6 +81,7 @@ def create_workflow_run(
     run_id = uuid4()
     run = WorkflowRun(
         id=run_id,
+        owner_id=owner_id,
         strategy_id=strategy_id,
         idea_id=idea_id,
         status=WorkflowRunStatus.PENDING,
@@ -84,7 +89,7 @@ def create_workflow_run(
     )
     db.add(run)
     # Queued in the same commit as the run: a crash cannot leave a run without its start job.
-    enqueue_workflow_job(db, "start", run_id)
+    enqueue_workflow_job(db, "start", run_id, owner_id=owner_id)
 
     try:
         db.commit()
@@ -139,6 +144,7 @@ def process_approval_decision(
     content_version_id: UUID,
     decision: ApprovalStatus,
     feedback: str | None = None,
+    owner_id=None,
 ) -> tuple[WorkflowRun, Approval]:
     """
     Processes an approval decision in a single atomic transaction:
@@ -150,7 +156,7 @@ def process_approval_decision(
     5. Commits transaction and returns (workflow_run, approval).
     """
     # 1. Fetch workflow run
-    run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id).first()
+    run = db.query(WorkflowRun).filter(WorkflowRun.id == workflow_run_id, WorkflowRun.owner_id == owner_id).first()
     if not run:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -232,7 +238,7 @@ def process_approval_decision(
     # Resume job in the same commit as the status change and the approval row.
     enqueue_workflow_job(
         db, "resume", run.id,
-        decision={"decision": decision.value, "feedback": feedback},
+        decision={"decision": decision.value, "feedback": feedback}, owner_id=run.owner_id,
     )
 
     try:
@@ -297,6 +303,7 @@ def create_human_edit_version(
     workflow_run_id: UUID,
     title: str | None,
     body: str,
+    owner_id=None,
 ) -> ContentVersion:
     """
     Saves a human edit as a NEW immutable version (origin HUMAN_EDIT). Existing versions
@@ -309,7 +316,7 @@ def create_human_edit_version(
 
     run = (
         db.query(WorkflowRun)
-        .filter(WorkflowRun.id == workflow_run_id)
+        .filter(WorkflowRun.id == workflow_run_id, WorkflowRun.owner_id == owner_id)
         .with_for_update()
         .first()
     )

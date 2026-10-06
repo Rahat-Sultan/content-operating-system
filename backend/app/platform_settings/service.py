@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.platform_settings.models import PlatformSetting
+from app.settings_security.service import key_for
 from app.publishing.buffer_provider import BUFFER_GRAPHQL_ENDPOINT, is_placeholder_buffer_token
 from app.publishing.platforms import PLATFORMS
 
@@ -26,18 +27,19 @@ CHANNEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 BUFFER_PLATFORMS = {"linkedin"}
 
 
-def _buffer_token_configured() -> bool:
-    return not is_placeholder_buffer_token(settings.buffer_access_token)
+def _buffer_token_configured(db: Session, owner_id) -> bool:
+    token = key_for(db, owner_id, "BUFFER_ACCESS_TOKEN")
+    return bool(token) and not is_placeholder_buffer_token(token)
 
 
-def _row(db: Session, key: str) -> PlatformSetting | None:
-    return db.query(PlatformSetting).filter(PlatformSetting.key == key).first()
+def _row(db: Session, owner_id, key: str) -> PlatformSetting | None:
+    return db.query(PlatformSetting).filter(PlatformSetting.owner_id == owner_id, PlatformSetting.key == key).first()
 
 
-def platform_views(db: Session) -> list[dict[str, Any]]:
+def platform_views(db: Session, owner_id) -> list[dict[str, Any]]:
     """Every known platform with its saved settings and readiness."""
-    rows = {r.key: r for r in db.query(PlatformSetting).all()}
-    token_ok = _buffer_token_configured()
+    rows = {r.key: r for r in db.query(PlatformSetting).filter(PlatformSetting.owner_id == owner_id).all()}
+    token_ok = _buffer_token_configured(db, owner_id)
     out = []
     for p in PLATFORMS:
         row = rows.get(p["key"])
@@ -70,7 +72,7 @@ def platform_views(db: Session) -> list[dict[str, Any]]:
     return out
 
 
-def update_platform(db: Session, key: str, data: dict[str, Any]) -> dict[str, Any]:
+def update_platform(db: Session, owner_id, key: str, data: dict[str, Any]) -> dict[str, Any]:
     if key not in {p["key"] for p in PLATFORMS}:
         raise HTTPException(status_code=404, detail=f"Unknown platform '{key}'.")
     channel_id = (data.get("channel_id") or "").strip() or None
@@ -79,9 +81,9 @@ def update_platform(db: Session, key: str, data: dict[str, Any]) -> dict[str, An
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Channel ID may contain only letters, digits, '-' and '_' (max 64).",
         )
-    row = _row(db, key)
+    row = _row(db, owner_id, key)
     if row is None:
-        row = PlatformSetting(key=key)
+        row = PlatformSetting(owner_id=owner_id, key=key)
         db.add(row)
     row.enabled = bool(data.get("enabled", False))
     row.display_name = (data.get("display_name") or "").strip() or None
@@ -89,21 +91,22 @@ def update_platform(db: Session, key: str, data: dict[str, Any]) -> dict[str, An
     row.notes = (data.get("notes") or "").strip() or None
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
-    return next(v for v in platform_views(db) if v["key"] == key)
+    return next(v for v in platform_views(db, owner_id) if v["key"] == key)
 
 
-def test_platform(db: Session, key: str) -> dict[str, Any]:
+def test_platform(db: Session, owner_id, key: str) -> dict[str, Any]:
     """
     Read-only check against Buffer that the saved channel exists and is connected.
     Sends one query for the channel. Never publishes.
     """
-    view = next((v for v in platform_views(db) if v["key"] == key), None)
+    view = next((v for v in platform_views(db, owner_id) if v["key"] == key), None)
     if view is None:
         raise HTTPException(status_code=404, detail=f"Unknown platform '{key}'.")
     if key not in BUFFER_PLATFORMS:
         return {"ok": False, "message": f"{view['label']} has no publishing provider yet, so there is nothing to test."}
-    if not _buffer_token_configured():
-        return {"ok": False, "message": "No Buffer token configured in .env."}
+    token = key_for(db, owner_id, "BUFFER_ACCESS_TOKEN")
+    if not token or is_placeholder_buffer_token(token):
+        return {"ok": False, "message": "No Buffer token saved for your account (Settings → API keys)."}
     if not view["channel_id"]:
         return {"ok": False, "message": "Save a channel ID first."}
 
@@ -111,7 +114,7 @@ def test_platform(db: Session, key: str) -> dict[str, Any]:
         '{ channel(input: {id: "%s"}) { id name service isDisconnected isQueuePaused } }'
         % view["channel_id"]
     )
-    headers = {"Authorization": f"Bearer {settings.buffer_access_token.strip()}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {token.strip()}", "Content-Type": "application/json"}
     try:
         with httpx.Client(timeout=15) as client:
             res = client.post(BUFFER_GRAPHQL_ENDPOINT, headers=headers, json={"query": query})

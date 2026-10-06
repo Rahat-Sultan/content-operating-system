@@ -13,22 +13,14 @@ from app.strategies.routes import router as strategies_router
 from app.media.routes import router as media_router
 from app.analytics.routes import router as analytics_router
 from app.platform_settings.routes import router as settings_router
-from app.settings_security.routes import auth_router, keys_router
+from app.settings_security.routes import keys_router
+from app.accounts.routes import router as accounts_router
 from app.llm.openrouter_client import check_api_key_configuration
 from app.health.network import check_network
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from app.db import SessionLocal
-    from app.settings_security.service import apply_saved_keys
-    db = SessionLocal()
-    try:
-        apply_saved_keys(db)  # keys saved from the Settings page; no-op without them
-    except Exception:
-        pass
-    finally:
-        db.close()
     check_api_key_configuration()
     yield
 
@@ -57,8 +49,8 @@ app.include_router(strategies_router, prefix="/api")
 app.include_router(media_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
-app.include_router(auth_router, prefix="/api")
 app.include_router(keys_router, prefix="/api")
+app.include_router(accounts_router, prefix="/api")
 
 
 
