@@ -25,9 +25,23 @@ def get_source(db: Session, source_id: UUID) -> Source:
     return source
 
 
+def source_name_for(name: str | None, url: str | None) -> str:
+    """
+    A source's name is what the user typed, or its link when they typed nothing.
+    Raises ValueError when there is neither a name nor a link.
+    """
+    typed = (name or "").strip()
+    if typed:
+        return typed
+    link = (url or "").strip()
+    if link:
+        return link
+    raise ValueError("A source needs a name or a link.")
+
+
 def create_source(
     db: Session,
-    name: str,
+    name: str | None,
     source_type: str = "rss",
     url: str | None = None,
     enabled: bool = True,
@@ -35,7 +49,7 @@ def create_source(
 ) -> Source:
     source = Source(
         id=uuid4(),
-        name=name,
+        name=source_name_for(name, url),
         source_type=source_type,
         url=url,
         enabled=enabled,
@@ -57,12 +71,17 @@ def update_source(
     config: dict[str, Any] | None = None,
 ) -> Source:
     source = get_source(db, source_id)
-    if name is not None:
-        source.name = name
+    auto_named = source.name == (source.url or "")  # named after its link
+    if url is not None:
+        if auto_named:
+            source.name = url.strip() or source.name
+        source.url = url
+    if name is not None and name.strip():
+        source.name = name.strip()
+    elif name is not None and not name.strip() and not source.name.strip():
+        source.name = source.url or source.name
     if source_type is not None:
         source.source_type = source_type
-    if url is not None:
-        source.url = url
     if enabled is not None:
         source.enabled = enabled
     if config is not None:

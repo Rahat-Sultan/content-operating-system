@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from uuid import UUID
 from typing import Any
 from fastapi import APIRouter, Depends, status
@@ -38,14 +39,17 @@ def create_source_endpoint(
     """
     Create a new content source (e.g. RSS feed).
     """
-    return create_source(
-        db=db,
-        name=request.name,
-        source_type=request.source_type,
-        url=request.url,
-        enabled=request.enabled,
-        config=request.config,
-    )
+    try:
+        return create_source(
+            db=db,
+            name=request.name,
+            source_type=request.source_type,
+            url=request.url,
+            enabled=request.enabled,
+            config=request.config,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/{id}", response_model=SourceResponse)

@@ -5,7 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateSourceRequest(BaseModel):
-    name: str = Field(..., min_length=1)
+    # Optional: when blank, the source is named after its link.
+    name: str | None = None
     source_type: str = Field(default="rss")
     url: str | None = None
     enabled: bool = True
@@ -13,6 +14,7 @@ class CreateSourceRequest(BaseModel):
 
 
 class UpdateSourceRequest(BaseModel):
+    # Blank or missing keeps the current name. A source with a link is named after the link.
     name: str | None = None
     source_type: str | None = None
     url: str | None = None
