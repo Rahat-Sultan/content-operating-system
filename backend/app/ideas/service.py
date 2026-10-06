@@ -11,10 +11,13 @@ def list_ideas(
     db: Session,
     status_filter: IdeaStatus | None = None,
     limit: int = 50,
+    strategy_id: UUID | None = None,
 ) -> list[Idea]:
     query = db.query(Idea)
     if status_filter:
         query = query.filter(Idea.status == status_filter)
+    if strategy_id:
+        query = query.filter(Idea.strategy_id == strategy_id)
     
     # Sort by final_score descending (nulls last)
     query = query.order_by(Idea.final_score.desc().nullslast(), Idea.created_at.desc())

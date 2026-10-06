@@ -24,6 +24,8 @@ class IdeaResponse(BaseModel):
     updated_at: datetime
     # Target platforms of the idea's strategy (lower case). Empty when the strategy has none.
     platforms: list[str] = []
+    # Name of the strategy this idea was discovered for.
+    strategy_name: str | None = None
 
 
 class SourceItemSummary(BaseModel):

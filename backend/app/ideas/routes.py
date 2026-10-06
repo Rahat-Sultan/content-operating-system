@@ -13,27 +13,30 @@ router = APIRouter(prefix="/ideas", tags=["ideas"])
 
 
 def _with_platforms(db: Session, ideas: list) -> list[IdeaResponse]:
-    """Each idea carries its strategy's target platforms. One query for the whole list."""
+    """Each idea carries its strategy's target platforms and name. One query for the whole list."""
     strategy_ids = {i.strategy_id for i in ideas}
-    configs = {
-        s.id: s.config
+    strategies = {
+        s.id: s
         for s in db.query(ContentStrategy).filter(ContentStrategy.id.in_(strategy_ids)).all()
     } if strategy_ids else {}
-    return [
-        IdeaResponse.model_validate(i).model_copy(
-            update={"platforms": platforms_for_strategy_config(configs.get(i.strategy_id))}
-        )
-        for i in ideas
-    ]
+    out = []
+    for i in ideas:
+        strat = strategies.get(i.strategy_id)
+        out.append(IdeaResponse.model_validate(i).model_copy(update={
+            "platforms": platforms_for_strategy_config(strat.config if strat else None),
+            "strategy_name": strat.name if strat else None,
+        }))
+    return out
 
 
 @router.get("", response_model=list[IdeaResponse])
 def get_all_ideas(
     status: IdeaStatus | None = Query(None, description="Filter by IdeaStatus"),
     limit: int = Query(50, ge=1, le=100),
+    strategy_id: UUID | None = Query(None, description="Only ideas from this strategy"),
     db: Session = Depends(get_db),
 ):
-    ideas = list_ideas(db=db, status_filter=status, limit=limit)
+    ideas = list_ideas(db=db, status_filter=status, limit=limit, strategy_id=strategy_id)
     return _with_platforms(db, ideas)
 
 
