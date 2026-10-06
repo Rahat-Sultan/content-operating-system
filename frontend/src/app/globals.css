@@ -75,3 +75,19 @@ body {
     @apply sticky top-0 z-10 flex items-center justify-between border-b border-line bg-panel/80 px-6 py-4 backdrop-blur;
   }
 }
+
+/* Thin, always-visible scrollbar for horizontally scrolling tables and tab rows. */
+.cos-scroll-x {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-raised-strong) transparent;
+}
+.cos-scroll-x::-webkit-scrollbar {
+  height: 6px;
+}
+.cos-scroll-x::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cos-scroll-x::-webkit-scrollbar-thumb {
+  background: var(--color-raised-strong);
+  border-radius: 999px;
+}

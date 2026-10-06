@@ -155,7 +155,7 @@ export default function IdeaDetailPage({
   return (
     <div className="min-h-screen bg-canvas text-strong pb-16">
       {/* Top Navbar */}
-      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <Link
             href="/ideas"
@@ -171,7 +171,7 @@ export default function IdeaDetailPage({
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         {/* 409 Conflict Recovery Banner */}
         {conflict && (
           <div className="p-4 rounded-xl bg-amber-950/50 border border-amber-600/70 text-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">

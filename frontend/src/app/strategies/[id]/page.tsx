@@ -203,7 +203,7 @@ export default function StrategyDetailPage({
   return (
     <div className="min-h-screen bg-canvas text-strong pb-16">
       {/* Top Navbar */}
-      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <Link
             href="/strategies"
@@ -235,7 +235,7 @@ export default function StrategyDetailPage({
       </header>
 
       {/* Main Container */}
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Banner Alert Messages */}
         {discoverySuccessMsg && (
           <div className="mb-6 p-4 rounded-lg bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-sm flex items-center justify-between">
@@ -564,7 +564,7 @@ export default function StrategyDetailPage({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-body font-medium mb-1">Niche</label>
                   <input
@@ -609,7 +609,7 @@ export default function StrategyDetailPage({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-body font-medium mb-1">Tone</label>
                   <input

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AppNav } from "@/components/AppNav";
 import { PlatformLogo } from "@/components/PlatformBadge";
 import {
   ApiKeyState,
@@ -243,7 +242,7 @@ function SettingsContent({ onLock: _onLock }: { onLock: () => void }) {
         </div>
       </div>
 
-      <section className="space-y-3">
+      <section id="api-keys" className="scroll-mt-20 space-y-3">
         <h3 className="cos-label">API keys</h3>
         <p className="text-xs text-muted">
           Keys are encrypted before they are stored. Once saved, a key is never shown again; only its last four characters.
@@ -252,7 +251,7 @@ function SettingsContent({ onLock: _onLock }: { onLock: () => void }) {
         {keys?.map((k) => <ApiKeyRow key={k.name} k={k} />)}
       </section>
 
-      <section className="space-y-4">
+      <section id="platforms" className="scroll-mt-20 space-y-4">
         <h3 className="cos-label">Platforms</h3>
         <p className="text-sm text-muted">
           A platform is used only when it is turned on, has a channel, and its token is set above or in <code className="font-mono">backend/.env</code>.
@@ -277,9 +276,8 @@ export default function SettingsPage() {
             <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
-        <AppNav />
       </header>
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         <SettingsContent onLock={() => undefined} />
       </main>
     </div>

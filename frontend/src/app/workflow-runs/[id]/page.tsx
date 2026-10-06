@@ -1,5 +1,6 @@
 "use client";
 
+import { ScrollX } from "@/components/ScrollX";
 import { use, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -11,6 +12,7 @@ import {
   fetchWorkflowRunBrief,
   fetchWorkflowRunDraft,
   submitApprovalDecision,
+  retryPublish,
   fetchWorkflowRunPublication,
   fetchPublicationAnalytics,
   syncPublicationAnalytics,
@@ -108,6 +110,7 @@ export default function WorkflowRunDetailPage({
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState("");
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -304,6 +307,21 @@ export default function WorkflowRunDetailPage({
     },
   });
 
+  // Retry publish for a FAILED run whose draft is already approved
+  const retryPublishMutation = useMutation({
+    mutationFn: () => retryPublish(id),
+    onSuccess: () => {
+      setRetryError(null);
+      queryClient.invalidateQueries({ queryKey: ["workflow-run", id] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-run-publication", id] });
+      refetch();
+    },
+    onError: (err: any) => {
+      setRetryError(err?.message || "Retry failed.");
+      queryClient.invalidateQueries({ queryKey: ["workflow-run", id] });
+    },
+  });
+
   // Approval Mutation
   const approvalMutation = useMutation({
     mutationFn: async ({
@@ -373,7 +391,7 @@ export default function WorkflowRunDetailPage({
 
   return (
     <div className="min-h-screen bg-canvas text-strong pb-20">
-      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <Link
             href={`/ideas/${run.idea_id}`}
@@ -445,7 +463,7 @@ export default function WorkflowRunDetailPage({
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* Header Block */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-line">
           <div className="space-y-1">
@@ -497,6 +515,20 @@ export default function WorkflowRunDetailPage({
           <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-300 space-y-1">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-400">Error Details</span>
             <p className="text-xs font-mono">{run.error}</p>
+            {run.status === "FAILED" && (
+              <div className="pt-2 space-y-1">
+                <button
+                  type="button"
+                  data-testid="retry-publish"
+                  onClick={() => retryPublishMutation.mutate()}
+                  disabled={retryPublishMutation.isPending}
+                  className="cos-btn cos-btn-primary text-xs"
+                >
+                  {retryPublishMutation.isPending ? "Publishing..." : "Retry publish"}
+                </button>
+                {retryError && <p className="text-xs text-rose-300">{retryError}</p>}
+              </div>
+            )}
           </div>
         )}
 
@@ -880,8 +912,8 @@ export default function WorkflowRunDetailPage({
                                 <span className="text-[10px] text-subtle animate-pulse">Refreshing...</span>
                               )}
                             </div>
-                            <div className="overflow-x-auto rounded-lg border border-line/80 bg-canvas/40">
-                              <table className="w-full text-left text-xs">
+                            <ScrollX className="rounded-lg border border-line/80 bg-canvas/40">
+                              <table className="w-full min-w-[560px] text-left text-xs">
                                 <thead className="bg-panel/80 text-[10px] uppercase text-subtle border-b border-line/80">
                                   <tr>
                                     <th className="py-2 px-3 font-semibold">Collected At</th>
@@ -951,7 +983,7 @@ export default function WorkflowRunDetailPage({
                                   })}
                                 </tbody>
                               </table>
-                            </div>
+                            </ScrollX>
                           </div>
                         )}
                       </div>
