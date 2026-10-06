@@ -35,3 +35,7 @@ class OwnedMixin:
         return mapped_column(
             PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
         )
+
+
+# Load the account models with the base, so every owner foreign key (users.id) resolves in any process.
+import app.accounts.models  # noqa: E402,F401
