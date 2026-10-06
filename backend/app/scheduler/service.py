@@ -20,6 +20,8 @@ from app.scheduler.schedule_calculator import (
 from app.strategies.service import run_strategy_discovery
 from app.analytics.service import sync_publication_metrics, NETWORK_ERROR_STATE
 from app.scheduler.heartbeat import write_heartbeat, scheduler_running
+from app.scheduler.lease import LeaseKeeper
+from app.scheduler.workflow_jobs import claim_run_start
 
 logger = logging.getLogger("scheduler")
 
@@ -281,7 +283,12 @@ class JobScheduler:
         )
 
         try:
-            if job.job_type == JobType.DISCOVERY:
+          with LeaseKeeper(job.id, self.worker_id):
+            if job.job_type == JobType.WORKFLOW_RUN:
+                job.result = self._run_workflow_job(job.payload)
+                job.status = JobStatus.COMPLETED
+
+            elif job.job_type == JobType.DISCOVERY:
                 skip_llm = job.payload.get("skip_llm_if_no_new_items", True)
                 result = run_strategy_discovery(
                     db,
@@ -353,6 +360,42 @@ class JobScheduler:
                 job.error = f"{type(exc).__name__}: {str(exc)}"
                 db.commit()
             return False
+
+    def _run_workflow_job(self, payload: dict) -> dict:
+        """
+        Runs a graph start or resume. Start claims PENDING -> RUNNING atomically first;
+        a job whose run is no longer PENDING is a duplicate and does nothing.
+        """
+        from uuid import UUID
+        from app.graph.content_graph import (
+            run_workflow_graph_background,
+            resume_workflow_graph_background,
+        )
+        from app.workflows.models import WorkflowRun
+
+        run_id = UUID(payload["workflow_run_id"])
+        action = payload["action"]
+
+        if action == "start":
+            db = SessionLocal()
+            try:
+                row = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
+                if row is None:
+                    return {"status": "skipped", "reason": "workflow run not found"}
+                strategy_id, idea_id = str(row.strategy_id), str(row.idea_id)
+                claimed = claim_run_start(db, run_id)
+            finally:
+                db.close()
+            if not claimed:
+                return {"status": "skipped", "reason": "run is not PENDING (already started)"}
+            run_workflow_graph_background(str(run_id), strategy_id, idea_id)
+            return {"status": "started", "workflow_run_id": str(run_id)}
+
+        if action == "resume":
+            resume_workflow_graph_background(str(run_id), payload.get("decision") or {})
+            return {"status": "resumed", "workflow_run_id": str(run_id)}
+
+        raise ValueError(f"Unknown workflow job action: {action}")
 
     def run_once(self) -> int:
         """Performs one scheduler tick."""

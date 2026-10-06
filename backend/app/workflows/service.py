@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 
 from app.ideas.models import Idea
 from app.strategies.models import ContentStrategy
+from app.scheduler.workflow_jobs import enqueue_workflow_job
 from app.workflows.models import WorkflowRun, WorkflowRunStatus
 from app.workflows.models import WorkflowRun, WorkflowRunStatus, Research, ContentBrief
 from app.content.models import Content, ContentVersion, Approval, ApprovalStatus
@@ -78,10 +79,12 @@ def create_workflow_run(
         id=run_id,
         strategy_id=strategy_id,
         idea_id=idea_id,
-        status=WorkflowRunStatus.RUNNING,
+        status=WorkflowRunStatus.PENDING,
         run_metadata={},
     )
     db.add(run)
+    # Queued in the same commit as the run: a crash cannot leave a run without its start job.
+    enqueue_workflow_job(db, "start", run_id)
 
     try:
         db.commit()
@@ -225,6 +228,12 @@ def process_approval_decision(
         feedback=feedback,
     )
     db.add(approval_record)
+
+    # Resume job in the same commit as the status change and the approval row.
+    enqueue_workflow_job(
+        db, "resume", run.id,
+        decision={"decision": decision.value, "feedback": feedback},
+    )
 
     try:
         db.commit()

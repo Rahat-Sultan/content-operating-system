@@ -32,6 +32,8 @@ class WorkerHeartbeat(Base):
 class JobType(str, enum.Enum):
     DISCOVERY = "DISCOVERY"
     ANALYTICS_SYNC = "ANALYTICS_SYNC"
+    # Production graph start or resume. payload: {"action": "start"|"resume", ...}
+    WORKFLOW_RUN = "WORKFLOW_RUN"
 
 
 class JobStatus(str, enum.Enum):

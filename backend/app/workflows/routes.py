@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -22,10 +22,8 @@ from app.workflows.service import (
     get_brief_for_workflow_run,
     get_draft_for_workflow_run,
 )
-from app.graph.content_graph import (
-    run_workflow_graph_background,
-    resume_workflow_graph_background,
-)
+
+from app.scheduler.heartbeat import scheduler_running
 
 router = APIRouter(prefix="/workflow-runs", tags=["workflow-runs"])
 
@@ -33,21 +31,13 @@ router = APIRouter(prefix="/workflow-runs", tags=["workflow-runs"])
 @router.post("", response_model=WorkflowRunResponse, status_code=200)
 def start_workflow_run(
     request: CreateWorkflowRunRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
+    # Queues a durable start job; the scheduler worker runs the graph.
     run = create_workflow_run(
         db=db,
         strategy_id=request.strategy_id,
         idea_id=request.idea_id,
-    )
-
-    # Launch graph asynchronously in background via FastAPI BackgroundTasks
-    background_tasks.add_task(
-        run_workflow_graph_background,
-        str(run.id),
-        str(run.strategy_id),
-        str(run.idea_id),
     )
 
     return WorkflowRunResponse(
@@ -58,6 +48,7 @@ def start_workflow_run(
         error=run.error,
         created_at=run.created_at,
         resolved_at=run.resolved_at,
+        worker_running=scheduler_running(db),
     )
 
 
@@ -95,6 +86,7 @@ def read_workflow_run(
         error=run.error,
         created_at=run.created_at,
         resolved_at=run.resolved_at,
+        worker_running=scheduler_running(db),
     )
 
 
@@ -102,7 +94,6 @@ def read_workflow_run(
 def submit_approval_decision(
     id: UUID,
     request: ApprovalDecisionRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     # Atomic transaction: verify status == NEEDS_REVIEW, verify version lock, update status, insert approval row
@@ -114,16 +105,7 @@ def submit_approval_decision(
         feedback=request.feedback,
     )
 
-    # Resume graph execution in background
-    decision_payload = {
-        "decision": request.decision.value,
-        "feedback": request.feedback,
-    }
-    background_tasks.add_task(
-        resume_workflow_graph_background,
-        str(run.id),
-        decision_payload,
-    )
+    # The resume job was queued atomically with the decision (process_approval_decision).
 
     return ApprovalDecisionResponse(
         workflow_run_id=run.id,

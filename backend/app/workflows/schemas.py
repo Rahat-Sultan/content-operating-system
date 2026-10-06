@@ -21,6 +21,8 @@ class WorkflowRunResponse(BaseModel):
     error: str | None = None
     created_at: datetime
     resolved_at: datetime | None = None
+    # False while a PENDING run is waiting for the scheduler worker to start it.
+    worker_running: bool | None = None
 
 
 class ApprovalDecisionRequest(BaseModel):

@@ -24,6 +24,8 @@ from tests.test_publishing_concurrency import seed_test_workflow_tree
 
 class TestScheduledAnalyticsSync(unittest.TestCase):
     def setUp(self):
+        from tests._db_guard import refuse_if_real_database
+        refuse_if_real_database()
         self.db = SessionLocal()
         # Ensure clean scheduled jobs table for test isolation
         self.db.query(ScheduledJob).delete()
