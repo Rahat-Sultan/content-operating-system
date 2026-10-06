@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AppNav } from "@/components/AppNav";
 import Link from "next/link";
 import {
   fetchStrategies,
@@ -162,7 +161,7 @@ export default function StrategiesPage() {
   return (
     <div className="min-h-screen bg-canvas text-strong">
       {/* Top Navbar */}
-      <header className="border-b border-line bg-panel/50 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="border-b border-line bg-panel/50 backdrop-blur px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
           <img src="/logo.svg" alt="Content OS" className="h-8 w-8 shrink-0" />
           <div>
@@ -170,11 +169,10 @@ export default function StrategiesPage() {
             <p className="text-xs text-muted">Autonomous Content Intelligence Engine</p>
           </div>
         </div>
-        <AppNav />
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-line">
           <div>
             <h2 className="text-2xl font-bold text-strong tracking-tight">Content Strategies</h2>
@@ -279,7 +277,7 @@ export default function StrategiesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-line/80 grid grid-cols-2 gap-2 text-xs">
+                    <div className="mt-4 pt-3 border-t border-line/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-subtle">Niche:</span>{" "}
                         <span className="text-body font-medium">{niche}</span>
@@ -410,7 +408,7 @@ export default function StrategiesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-body font-medium mb-1">Niche</label>
                   <input
@@ -446,7 +444,7 @@ export default function StrategiesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-body font-medium mb-1">Tone</label>
                   <input

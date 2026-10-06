@@ -239,6 +239,7 @@ export interface PublicationResponse {
   status: "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED";
   idempotency_key: string;
   external_id?: string | null;
+  idea_title?: string | null;
   url?: string | null;
   publication_metadata: Record<string, any>;
   error?: string | null;
@@ -595,6 +596,7 @@ export interface AnalyticsSummaryPost {
   workflow_run_id: string | null;
   platform: string;
   external_id: string | null;
+  idea_title: string | null;
   published_at: string | null;
   has_snapshot: boolean;
   collected_at: string | null;
@@ -846,3 +848,12 @@ export async function logoutAccount(): Promise<void> {
 }
 
 export const GOOGLE_LOGIN_URL = `${API_BASE}/auth/google/start`;
+
+export async function retryPublish(workflowRunId: string): Promise<WorkflowRunResponse> {
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${workflowRunId}/retry-publish`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Retry failed (HTTP ${res.status})`);
+  }
+  return res.json();
+}

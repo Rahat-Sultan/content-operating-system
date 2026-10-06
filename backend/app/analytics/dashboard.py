@@ -59,6 +59,7 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
 
     # Workflow run for each publication (for linking to its page).
     run_for: dict = {}
+    idea_title_for: dict = {}
     if pub_ids:
         pairs = (
             db.query(Publication.id, Content.workflow_run_id)
@@ -69,6 +70,20 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
         )
         run_for = {pid: str(run_id) for pid, run_id in pairs}
 
+        # Idea title for each publication, so the table names the post by its idea.
+        from app.workflows.models import WorkflowRun
+        from app.ideas.models import Idea
+        title_rows = (
+            db.query(Publication.id, Idea.title)
+            .join(ContentVersion, ContentVersion.id == Publication.content_version_id)
+            .join(Content, Content.id == ContentVersion.content_id)
+            .join(WorkflowRun, WorkflowRun.id == Content.workflow_run_id)
+            .join(Idea, Idea.id == WorkflowRun.idea_id)
+            .filter(Publication.id.in_(pub_ids))
+            .all()
+        )
+        idea_title_for = {pid: title for pid, title in title_rows}
+
     posts = []
     for pub in pubs:
         snap = latest.get(pub.id)
@@ -76,6 +91,7 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
         posts.append({
             "publication_id": str(pub.id),
             "workflow_run_id": run_for.get(pub.id),
+            "idea_title": idea_title_for.get(pub.id),
             "platform": pub.platform,
             "external_id": pub.external_id,
             "published_at": pub.published_at.isoformat() if pub.published_at else None,

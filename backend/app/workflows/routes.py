@@ -299,3 +299,10 @@ def read_workflow_run_publication(
         analytics_status=analytics_status,
     )
 
+
+
+@router.post("/{id}/retry-publish", response_model=WorkflowRunResponse)
+def retry_publish_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Retries publishing for a FAILED run with an approved draft. The publish is idempotent per version."""
+    from app.workflows.service import retry_publish
+    return retry_publish(db=db, run_id=id, owner_id=user.id)
