@@ -683,3 +683,42 @@ export async function deleteStrategy(id: string) {
   if (!res.ok) throw await errorFrom(res, "Could not delete the strategy.");
   return res.json();
 }
+
+export interface PlatformSetting {
+  key: string;
+  label: string;
+  display_name: string;
+  enabled: boolean;
+  channel_id: string | null;
+  notes: string | null;
+  publishes_via: string | null;
+  state: "ready" | "needs_token" | "disabled" | "needs_channel" | "no_provider";
+  ready: boolean;
+  reason: string;
+  updated_at: string | null;
+}
+
+export async function fetchPlatformSettings(): Promise<PlatformSetting[]> {
+  const res = await fetch(`${API_BASE}/settings/platforms`);
+  if (!res.ok) throw await errorFrom(res, "Could not load platform settings.");
+  return res.json();
+}
+
+export async function savePlatformSettings(
+  key: string,
+  body: { enabled: boolean; display_name: string | null; channel_id: string | null; notes: string | null }
+): Promise<PlatformSetting> {
+  const res = await fetch(`${API_BASE}/settings/platforms/${key}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not save.");
+  return res.json();
+}
+
+export async function testPlatformConnection(key: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/settings/platforms/${key}/test`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Test failed.");
+  return res.json();
+}

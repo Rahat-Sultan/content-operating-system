@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/sources", label: "Sources" },
   { href: "/strategies", label: "Strategies" },
   { href: "/ideas", label: "Ideas" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export function AppNav() {

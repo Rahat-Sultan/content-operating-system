@@ -31,6 +31,7 @@ Strategy ─▶ Sources (RSS) ─▶ Scout + score (LLM) ─▶ Ideas ─▶ [yo
 | Sources | `/sources` | Add RSS sources. |
 | Run page | `/workflow-runs/{id}` | Review the draft, edit it, approve or request a revision, see media, analytics, publication. |
 | Analytics | `/analytics` | Per-platform tabs and a Show all view; impressions chart and table. |
+| Settings | `/settings` | Turn platforms on or off, set each Buffer channel ID, test the connection (read-only). |
 
 ![Ideas board](images/ideas-board.png)
 ![Run page](images/run-page.png)
@@ -161,6 +162,7 @@ The full reference is in [../API.md](../API.md). The routes:
 | Media | `GET/POST /api/content/{content_id}/versions/{version_id}/media`, `GET /api/media/files/{filename}` |
 | Publications | `GET /api/publications/{id}`, `GET /api/publications/{id}/analytics`, `POST .../analytics/sync`, `POST .../analytics/manual` |
 | Analytics | `GET /api/analytics/summary` (`platform=`, `include_test=`) |
+| Settings | `GET /api/settings/platforms`, `PUT /api/settings/platforms/{key}`, `POST /api/settings/platforms/{key}/test` (read-only) |
 
 ---
 

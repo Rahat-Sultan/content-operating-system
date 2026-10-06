@@ -93,11 +93,13 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
         })
 
     known = [p["key"] for p in PLATFORMS]
+    from app.platform_settings.service import platform_views
+    ready = {v["key"]: v["ready"] for v in platform_views(db)}
     breakdown = []
     for info in PLATFORMS:
         key = info["key"]
         rows = [p for p in all_pubs if normalize_platform(p.platform) == key]
-        breakdown.append({"key": key, "label": info["label"], "connected": info["connected"],
+        breakdown.append({"key": key, "label": info["label"], "connected": ready.get(key, False),
                           "post_count": len(rows)})
     for key in sorted({normalize_platform(p.platform) for p in all_pubs} - set(known)):
         breakdown.append({"key": key, "label": key, "connected": False,
