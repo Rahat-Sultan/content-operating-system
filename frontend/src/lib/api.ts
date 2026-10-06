@@ -667,8 +667,9 @@ export async function restoreIdea(id: string) {
   return res.json();
 }
 
-export async function deleteIdea(id: string) {
-  const res = await apiFetch(`${API_BASE}/ideas/${id}`, { method: "DELETE" });
+export async function deleteIdea(id: string, stopRunning = true): Promise<{ status: "deleted" | "stopping"; message?: string }> {
+  // stopRunning: first stop the idea's workflow runs, then delete them with it.
+  const res = await apiFetch(`${API_BASE}/ideas/${id}?stop_running=${stopRunning}`, { method: "DELETE" });
   if (!res.ok) throw await errorFrom(res, "Could not delete the idea.");
   return res.json();
 }

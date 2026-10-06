@@ -37,7 +37,14 @@ export default function IdeasPage() {
     mutationFn: async ({ id, kind }: { id: string; kind: "archive" | "restore" | "delete" }) => {
       if (kind === "archive") return archiveIdea(id);
       if (kind === "restore") return restoreIdea(id);
-      return deleteIdea(id);
+      // Stop the running work first. If a step is still finishing, wait and try again.
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const result = await deleteIdea(id, true);
+        if (result.status === "deleted") return result;
+        setRowError((e) => ({ ...e, [id]: "Stopping the running step… the idea is deleted when it stops." }));
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      }
+      throw new Error("The running step did not stop in time. Try again in a minute.");
     },
     onSuccess: (_, v) => {
       setRowError((e) => ({ ...e, [v.id]: "" }));
@@ -49,7 +56,11 @@ export default function IdeasPage() {
   });
 
   function confirmDelete(idea: IdeaItem) {
-    if (window.confirm(`Delete "${idea.title}" permanently? This cannot be undone.`)) {
+    const message =
+      `Delete "${idea.title}" permanently?\n\n` +
+      `If it has a workflow run, that run is stopped first. Its drafts, approvals and publication records are deleted too. ` +
+      `Published LinkedIn posts stay on LinkedIn. This cannot be undone.`;
+    if (window.confirm(message)) {
       act.mutate({ id: idea.id, kind: "delete" });
     }
   }

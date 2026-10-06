@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.ideas.models import Idea, IdeaStatus
-from app.workflows.models import WorkflowRun
+from app.workflows.models import WorkflowRun, WorkflowRunStatus
 
 
 def title_already_proposed(db: Session, strategy_id: UUID, title: str) -> bool:
@@ -125,3 +125,82 @@ def delete_strategy(db: Session, strategy_id: UUID, owner_id: UUID) -> dict:
     db.delete(strategy)
     db.commit()
     return {"deleted_strategy_id": str(strategy_id), "deleted_ideas": ideas}
+
+
+ACTIVE_RUN_STATUSES = [
+    WorkflowRunStatus.PENDING, WorkflowRunStatus.RUNNING,
+    WorkflowRunStatus.PAUSED, WorkflowRunStatus.NEEDS_REVIEW,
+]
+
+
+def stop_and_delete_idea(db: Session, idea_id: UUID, owner_id: UUID) -> dict:
+    """
+    Stops every workflow run of the idea, then deletes the idea and everything under it.
+
+    - A post that is being published right now is never interrupted: the delete is refused until it finishes.
+    - Queued steps are removed. A step already running cannot be killed inside the worker, so the
+      result is "stopping"; the caller retries and the delete completes once nothing is running.
+    - Published LinkedIn posts stay on LinkedIn. Only their records here are deleted.
+    """
+    from app.scheduler.models import JobStatus, JobType, ScheduledJob
+    from app.publishing.models import Publication, PublicationStatus
+    from datetime import datetime, timezone
+
+    idea = db.query(Idea).filter(Idea.id == idea_id, Idea.owner_id == owner_id).first()
+    if idea is None:
+        raise HTTPException(status_code=404, detail=f"Idea {idea_id} not found.")
+
+    run_ids = [r.id for r in db.query(WorkflowRun.id).filter(WorkflowRun.idea_id == idea_id).all()]
+    if run_ids:
+        publishing = (
+            db.query(WorkflowRun)
+            .filter(WorkflowRun.idea_id == idea_id, WorkflowRun.status == WorkflowRunStatus.PUBLISHING)
+            .count()
+        )
+        if publishing:
+            raise HTTPException(
+                status_code=409,
+                detail="A post for this idea is being published right now. Wait for it to finish, then delete.",
+            )
+        now = datetime.now(timezone.utc)
+        # 1. No new work: runs become CANCELLED and their queued steps are removed.
+        db.query(WorkflowRun).filter(
+            WorkflowRun.idea_id == idea_id, WorkflowRun.status.in_(ACTIVE_RUN_STATUSES),
+        ).update({WorkflowRun.status: WorkflowRunStatus.CANCELLED, WorkflowRun.resolved_at: now},
+                 synchronize_session=False)
+        run_id_strings = [str(r) for r in run_ids]
+        db.query(ScheduledJob).filter(
+            ScheduledJob.job_type == JobType.WORKFLOW_RUN,
+            ScheduledJob.status == JobStatus.PENDING,
+            ScheduledJob.payload["workflow_run_id"].astext.in_(run_id_strings),
+        ).update({ScheduledJob.status: JobStatus.FAILED, ScheduledJob.error: "stopped: idea deleted",
+                  ScheduledJob.completed_at: now}, synchronize_session=False)
+        db.commit()
+
+        # 2. A step that is running right now finishes first; it cannot be interrupted safely.
+        still_running = (
+            db.query(ScheduledJob)
+            .filter(
+                ScheduledJob.job_type == JobType.WORKFLOW_RUN,
+                ScheduledJob.status == JobStatus.RUNNING,
+                ScheduledJob.payload["workflow_run_id"].astext.in_(run_id_strings),
+            )
+            .count()
+        )
+        if still_running:
+            return {"status": "stopping", "message": "A step is still running. It stops at its next checkpoint, then the idea is deleted."}
+
+    published = 0
+    if run_ids:
+        from app.content.models import Content, ContentVersion
+        published = (
+            db.query(Publication)
+            .join(ContentVersion, ContentVersion.id == Publication.content_version_id)
+            .join(Content, Content.id == ContentVersion.content_id)
+            .filter(Content.workflow_run_id.in_(run_ids), Publication.status == PublicationStatus.PUBLISHED)
+            .count()
+        )
+    # 3. Delete: runs, drafts, approvals, publications and analytics go with it (cascade).
+    db.delete(idea)
+    db.commit()
+    return {"status": "deleted", "published_posts_kept_on_platform": published}

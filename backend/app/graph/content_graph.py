@@ -84,6 +84,17 @@ def get_content_graph():
     return build_content_graph().compile(checkpointer=checkpointer)
 
 
+
+def _run_cancelled(run_id: UUID) -> bool:
+    """True once the run has been cancelled (for example, its idea was stopped and deleted)."""
+    from app.db import SessionLocal
+    db = SessionLocal()
+    try:
+        status_value = db.query(WorkflowRun.status).filter(WorkflowRun.id == run_id).scalar()
+        return status_value == WorkflowRunStatus.CANCELLED
+    finally:
+        db.close()
+
 def run_workflow_graph_background(workflow_run_id_str: str, strategy_id_str: str, idea_id_str: str):
     """
     Background worker function to execute the graph for a newly launched WorkflowRun.
@@ -124,12 +135,13 @@ def run_workflow_graph_background(workflow_run_id_str: str, strategy_id_str: str
             app = build_content_graph().compile(checkpointer=checkpointer)
 
             for _ in app.stream(initial_state, config):
-                pass
+                if _run_cancelled(run_id):
+                    break  # stop before the next step; the current step has finished
 
             # Inspect state after stream pauses or finishes
             state = app.get_state(config)
             run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-            if run:
+            if run and run.status != WorkflowRunStatus.CANCELLED:
                 if state.next:  # Paused at interrupt (e.g. approval)
                     run.status = WorkflowRunStatus.NEEDS_REVIEW
                     db.commit()
@@ -142,7 +154,7 @@ def run_workflow_graph_background(workflow_run_id_str: str, strategy_id_str: str
         logger.error("Background graph run %s failed: %s", workflow_run_id_str, exc, exc_info=True)
         try:
             run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-            if run:
+            if run and run.status != WorkflowRunStatus.CANCELLED:
                 run.status = WorkflowRunStatus.FAILED
                 run.error = f"Workflow graph execution failed: {type(exc).__name__}: {str(exc)}"
                 run.resolved_at = datetime.now(timezone.utc)
@@ -170,12 +182,13 @@ def resume_workflow_graph_background(workflow_run_id_str: str, decision_data: di
 
             # Resume with Command(resume=decision_data)
             for _ in app.stream(Command(resume=decision_data), config):
-                pass
+                if _run_cancelled(run_id):
+                    break
 
             # Inspect new state after resume
             state = app.get_state(config)
             run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-            if run:
+            if run and run.status != WorkflowRunStatus.CANCELLED:
                 if state.next:  # Paused again (e.g. after revision loop returns to approval)
                     run.status = WorkflowRunStatus.NEEDS_REVIEW
                     db.commit()
@@ -191,7 +204,7 @@ def resume_workflow_graph_background(workflow_run_id_str: str, decision_data: di
         logger.error("Background resume for run %s failed: %s", workflow_run_id_str, exc, exc_info=True)
         try:
             run = db.query(WorkflowRun).filter(WorkflowRun.id == run_id).first()
-            if run:
+            if run and run.status != WorkflowRunStatus.CANCELLED:
                 run.status = WorkflowRunStatus.FAILED
                 run.error = f"Workflow resume execution failed: {type(exc).__name__}: {str(exc)}"
                 run.resolved_at = datetime.now(timezone.utc)

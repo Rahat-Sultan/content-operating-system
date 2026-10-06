@@ -57,11 +57,26 @@ def restore_idea_endpoint(id: UUID, db: Session = Depends(get_db), user: User = 
 
 
 @router.delete("/{id}")
-def delete_idea_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    """Permanent. Refused (409) if the idea has any workflow run. Archive instead."""
-    from app.ideas.lifecycle import delete_idea
-    delete_idea(db, id, user.id)
-    return {"deleted": str(id)}
+def delete_idea_endpoint(
+    id: UUID,
+    stop_running: bool = Query(False, description="Stop the idea's workflow runs first, then delete"),
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    """
+    Permanent. Without stop_running, refused (409) while the idea has a workflow run.
+    With stop_running, stops the runs first and deletes them with the idea; answers 202 "stopping"
+    while a step is still finishing, so the caller retries.
+    """
+    from fastapi.responses import JSONResponse
+    from app.ideas.lifecycle import delete_idea, stop_and_delete_idea
+    if not stop_running:
+        delete_idea(db, id, user.id)
+        return {"status": "deleted"}
+    result = stop_and_delete_idea(db, id, user.id)
+    if result["status"] == "stopping":
+        return JSONResponse(status_code=202, content=result)
+    return result
 
 
 @router.get("/{id}", response_model=IdeaResponse)
