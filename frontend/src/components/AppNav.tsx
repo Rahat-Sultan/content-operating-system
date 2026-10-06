@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchMe, logoutAccount } from "@/lib/api";
 
 // One navigation for every page. Add a page here and it appears everywhere.
 const LINKS = [
@@ -14,6 +16,12 @@ const LINKS = [
 
 export function AppNav() {
   const pathname = usePathname() ?? "";
+  const queryClient = useQueryClient();
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const logout = useMutation({
+    mutationFn: logoutAccount,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+  });
   return (
     <nav className="flex items-center gap-6" aria-label="Main">
       {LINKS.map((l) => {
@@ -31,6 +39,14 @@ export function AppNav() {
           </Link>
         );
       })}
+      {me && (
+        <span className="flex items-center gap-3 border-l border-line pl-4">
+          <span className="text-xs text-muted" data-testid="account-email">{me.display_name ?? me.email}</span>
+          <button onClick={() => logout.mutate()} className="text-xs font-semibold text-body hover:text-strong">
+            Log out
+          </button>
+        </span>
+      )}
     </nav>
   );
 }

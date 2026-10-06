@@ -1,5 +1,10 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
+/** Every API call goes through here so the session cookie is always sent. */
+export function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { credentials: "include", ...init });
+}
+
 export interface IdeaItem {
   id: string;
   strategy_id: string;
@@ -105,7 +110,7 @@ export async function fetchIdeas(status?: string, strategyId?: string, limit?: n
   if (strategyId) params.set("strategy_id", strategyId);
   const url = params.toString() ? `${API_BASE}/ideas?${params.toString()}` : `${API_BASE}/ideas`;
   
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch ideas: ${res.statusText}`);
   }
@@ -113,7 +118,7 @@ export async function fetchIdeas(status?: string, strategyId?: string, limit?: n
 }
 
 export async function fetchIdea(id: string): Promise<IdeaItem> {
-  const res = await fetch(`${API_BASE}/ideas/${id}`);
+  const res = await apiFetch(`${API_BASE}/ideas/${id}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch idea ${id}: ${res.statusText}`);
   }
@@ -121,7 +126,7 @@ export async function fetchIdea(id: string): Promise<IdeaItem> {
 }
 
 export async function fetchIdeaSources(id: string): Promise<SourceItemSummary[]> {
-  const res = await fetch(`${API_BASE}/ideas/${id}/sources`);
+  const res = await apiFetch(`${API_BASE}/ideas/${id}/sources`);
   if (!res.ok) {
     throw new Error(`Failed to fetch idea sources: ${res.statusText}`);
   }
@@ -129,7 +134,7 @@ export async function fetchIdeaSources(id: string): Promise<SourceItemSummary[]>
 }
 
 export async function startWorkflowRun(ideaId: string, strategyId: string): Promise<WorkflowRunResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs`, {
+  const res = await apiFetch(`${API_BASE}/workflow-runs`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -165,7 +170,7 @@ export async function startWorkflowRun(ideaId: string, strategyId: string): Prom
 }
 
 export async function fetchWorkflowRun(id: string): Promise<WorkflowRunResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs/${id}`);
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${id}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch workflow run ${id}: ${res.statusText}`);
   }
@@ -178,7 +183,7 @@ export async function fetchWorkflowRun(id: string): Promise<WorkflowRunResponse>
 }
 
 export async function fetchWorkflowRunResearch(id: string): Promise<ResearchResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs/${id}/research`);
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${id}/research`);
   if (!res.ok) {
     throw new Error(`Failed to fetch research for workflow run ${id}: ${res.statusText}`);
   }
@@ -186,7 +191,7 @@ export async function fetchWorkflowRunResearch(id: string): Promise<ResearchResp
 }
 
 export async function fetchWorkflowRunBrief(id: string): Promise<ContentBriefResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs/${id}/brief`);
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${id}/brief`);
   if (!res.ok) {
     throw new Error(`Failed to fetch brief for workflow run ${id}: ${res.statusText}`);
   }
@@ -194,7 +199,7 @@ export async function fetchWorkflowRunBrief(id: string): Promise<ContentBriefRes
 }
 
 export async function fetchWorkflowRunDraft(id: string): Promise<ContentDraftResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs/${id}/draft`);
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${id}/draft`);
   if (!res.ok) {
     throw new Error(`Failed to fetch draft for workflow run ${id}: ${res.statusText}`);
   }
@@ -207,7 +212,7 @@ export async function submitApprovalDecision(
   decision: "APPROVED" | "REJECTED" | "REVISION_REQUESTED",
   feedback?: string
 ): Promise<ApprovalDecisionResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs/${workflowRunId}/approval`, {
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${workflowRunId}/approval`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -271,7 +276,7 @@ export interface AnalyticsStatus {
 }
 
 export async function fetchWorkflowRunPublication(id: string): Promise<PublicationResponse> {
-  const res = await fetch(`${API_BASE}/workflow-runs/${id}/publication`);
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${id}/publication`);
   if (!res.ok) {
     throw new Error(`Failed to fetch publication for workflow run ${id}: ${res.statusText}`);
   }
@@ -359,7 +364,7 @@ export async function fetchStrategies(enabledOnly = false, archived?: boolean): 
   if (enabledOnly) params.set("enabled_only", "true");
   if (archived !== undefined) params.set("archived", String(archived));
   const url = `${API_BASE}/strategies${params.toString() ? `?${params.toString()}` : ""}`;
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch strategies: ${res.statusText}`);
   }
@@ -367,7 +372,7 @@ export async function fetchStrategies(enabledOnly = false, archived?: boolean): 
 }
 
 export async function fetchStrategy(id: string): Promise<StrategyItem> {
-  const res = await fetch(`${API_BASE}/strategies/${id}`);
+  const res = await apiFetch(`${API_BASE}/strategies/${id}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch strategy ${id}: ${res.statusText}`);
   }
@@ -375,7 +380,7 @@ export async function fetchStrategy(id: string): Promise<StrategyItem> {
 }
 
 export async function createStrategy(payload: CreateStrategyPayload): Promise<StrategyItem> {
-  const res = await fetch(`${API_BASE}/strategies`, {
+  const res = await apiFetch(`${API_BASE}/strategies`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -388,7 +393,7 @@ export async function createStrategy(payload: CreateStrategyPayload): Promise<St
 }
 
 export async function updateStrategy(id: string, payload: UpdateStrategyPayload): Promise<StrategyItem> {
-  const res = await fetch(`${API_BASE}/strategies/${id}`, {
+  const res = await apiFetch(`${API_BASE}/strategies/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -401,7 +406,7 @@ export async function updateStrategy(id: string, payload: UpdateStrategyPayload)
 }
 
 export async function runStrategyDiscovery(id: string): Promise<StrategyDiscoveryResult> {
-  const res = await fetch(`${API_BASE}/strategies/${id}/discover`, {
+  const res = await apiFetch(`${API_BASE}/strategies/${id}/discover`, {
     method: "POST",
   });
   const data = await res.json();
@@ -428,7 +433,7 @@ export interface UpdateSourcePayload {
 }
 
 export async function fetchSources(): Promise<SourceOption[]> {
-  const res = await fetch(`${API_BASE}/sources`);
+  const res = await apiFetch(`${API_BASE}/sources`);
   if (!res.ok) {
     throw new Error(`Failed to fetch sources: ${res.statusText}`);
   }
@@ -436,7 +441,7 @@ export async function fetchSources(): Promise<SourceOption[]> {
 }
 
 export async function createSource(payload: CreateSourcePayload): Promise<SourceOption> {
-  const res = await fetch(`${API_BASE}/sources`, {
+  const res = await apiFetch(`${API_BASE}/sources`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -449,7 +454,7 @@ export async function createSource(payload: CreateSourcePayload): Promise<Source
 }
 
 export async function updateSource(id: string, payload: UpdateSourcePayload): Promise<SourceOption> {
-  const res = await fetch(`${API_BASE}/sources/${id}`, {
+  const res = await apiFetch(`${API_BASE}/sources/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -484,7 +489,7 @@ export interface AnalyticsSnapshot {
 }
 
 export async function fetchPublicationAnalytics(publicationId: string): Promise<AnalyticsSnapshot[]> {
-  const res = await fetch(`${API_BASE}/publications/${publicationId}/analytics`);
+  const res = await apiFetch(`${API_BASE}/publications/${publicationId}/analytics`);
   if (!res.ok) {
     throw new Error(`Failed to fetch analytics for publication ${publicationId}: ${res.statusText}`);
   }
@@ -492,7 +497,7 @@ export async function fetchPublicationAnalytics(publicationId: string): Promise<
 }
 
 export async function syncPublicationAnalytics(publicationId: string): Promise<AnalyticsSnapshot> {
-  const res = await fetch(`${API_BASE}/publications/${publicationId}/analytics/sync`, {
+  const res = await apiFetch(`${API_BASE}/publications/${publicationId}/analytics/sync`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
@@ -520,7 +525,7 @@ export async function submitManualMetrics(
   publicationId: string,
   payload: ManualMetricsInputPayload
 ): Promise<AnalyticsSnapshot> {
-  const res = await fetch(`${API_BASE}/publications/${publicationId}/analytics/manual`, {
+  const res = await apiFetch(`${API_BASE}/publications/${publicationId}/analytics/manual`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -560,7 +565,7 @@ export async function fetchVersionMedia(
   contentId: string,
   versionId: string
 ): Promise<MediaAsset[]> {
-  const res = await fetch(`${API_BASE}/content/${contentId}/versions/${versionId}/media`);
+  const res = await apiFetch(`${API_BASE}/content/${contentId}/versions/${versionId}/media`);
   if (!res.ok) {
     throw new Error(`Failed to fetch media assets: ${res.statusText}`);
   }
@@ -573,7 +578,7 @@ export async function generateVersionMedia(
   prompt?: string,
   regenerate: boolean = false
 ): Promise<MediaAsset> {
-  const res = await fetch(`${API_BASE}/content/${contentId}/versions/${versionId}/media`, {
+  const res = await apiFetch(`${API_BASE}/content/${contentId}/versions/${versionId}/media`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt, regenerate }),
@@ -623,7 +628,7 @@ export interface PlatformBreakdown {
 export async function fetchAnalyticsSummary(includeTest = false, platform?: string): Promise<AnalyticsSummary & { platform: string | null; platforms: PlatformBreakdown[] }> {
   const qs = new URLSearchParams({ include_test: String(includeTest) });
   if (platform) qs.set("platform", platform);
-  const res = await fetch(`${API_BASE}/analytics/summary?${qs.toString()}`);
+  const res = await apiFetch(`${API_BASE}/analytics/summary?${qs.toString()}`);
   if (!res.ok) throw new Error(`Failed to load analytics summary: ${res.statusText}`);
   return res.json();
 }
@@ -641,7 +646,7 @@ async function errorFrom(res: Response, fallback: string): Promise<Error> {
 }
 
 export async function saveDraftEdit(runId: string, edit: { title: string | null; body: string }) {
-  const res = await fetch(`${API_BASE}/workflow-runs/${runId}/draft/versions`, {
+  const res = await apiFetch(`${API_BASE}/workflow-runs/${runId}/draft/versions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(edit),
@@ -651,35 +656,35 @@ export async function saveDraftEdit(runId: string, edit: { title: string | null;
 }
 
 export async function archiveIdea(id: string) {
-  const res = await fetch(`${API_BASE}/ideas/${id}/archive`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/ideas/${id}/archive`, { method: "POST" });
   if (!res.ok) throw await errorFrom(res, "Could not archive the idea.");
   return res.json();
 }
 
 export async function restoreIdea(id: string) {
-  const res = await fetch(`${API_BASE}/ideas/${id}/restore`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/ideas/${id}/restore`, { method: "POST" });
   if (!res.ok) throw await errorFrom(res, "Could not restore the idea.");
   return res.json();
 }
 
 export async function deleteIdea(id: string) {
-  const res = await fetch(`${API_BASE}/ideas/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/ideas/${id}`, { method: "DELETE" });
   if (!res.ok) throw await errorFrom(res, "Could not delete the idea.");
   return res.json();
 }
 
 export async function archiveStrategy(id: string) {
-  const res = await fetch(`${API_BASE}/strategies/${id}/archive`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/strategies/${id}/archive`, { method: "POST" });
   if (!res.ok) throw await errorFrom(res, "Could not archive the strategy.");
 }
 
 export async function restoreStrategy(id: string) {
-  const res = await fetch(`${API_BASE}/strategies/${id}/restore`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/strategies/${id}/restore`, { method: "POST" });
   if (!res.ok) throw await errorFrom(res, "Could not restore the strategy.");
 }
 
 export async function deleteStrategy(id: string) {
-  const res = await fetch(`${API_BASE}/strategies/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/strategies/${id}`, { method: "DELETE" });
   if (!res.ok) throw await errorFrom(res, "Could not delete the strategy.");
   return res.json();
 }
@@ -733,7 +738,7 @@ export interface SettingsAuthState {
 
 async function settingsCall(path: string, init?: RequestInit): Promise<Response> {
   // credentials: include sends the Settings session cookie, which the browser drops when it closes.
-  return fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
+  return apiFetch(`${API_BASE}${path}`, { credentials: "include", ...init });
 }
 
 export async function fetchSettingsAuth(): Promise<SettingsAuthState> {
@@ -787,3 +792,56 @@ export async function removeApiKey(name: string): Promise<void> {
   const res = await settingsCall(`/settings/keys/${name}`, { method: "DELETE" });
   if (!res.ok) throw await errorFrom(res, "Could not remove the key.");
 }
+
+// ---------- Accounts (login for the whole app) ----------
+
+export interface Account {
+  id: string;
+  email: string;
+  display_name: string | null;
+  auth_provider: string;
+  is_admin: boolean;
+}
+
+export interface AuthProviders {
+  local: { enabled: boolean };
+  google: { enabled: boolean };
+  supabase: { enabled: boolean; reason?: string };
+}
+
+/** The signed-in account, or null when nobody is logged in. */
+export async function fetchMe(): Promise<Account | null> {
+  const res = await apiFetch(`${API_BASE}/auth/me`);
+  if (res.status === 401) return null;
+  if (!res.ok) throw await errorFrom(res, "Could not check your login.");
+  return res.json();
+}
+
+export async function fetchAuthProviders(): Promise<AuthProviders> {
+  const res = await apiFetch(`${API_BASE}/auth/providers`);
+  if (!res.ok) throw await errorFrom(res, "Could not load sign-in options.");
+  return res.json();
+}
+
+export async function loginAccount(email: string, password: string): Promise<Account> {
+  const res = await apiFetch(`${API_BASE}/auth/login`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not log in.");
+  return res.json();
+}
+
+export async function registerAccount(email: string, password: string, displayName: string): Promise<Account> {
+  const res = await apiFetch(`${API_BASE}/auth/register`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, display_name: displayName || null }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not create the account.");
+  return res.json();
+}
+
+export async function logoutAccount(): Promise<void> {
+  await apiFetch(`${API_BASE}/auth/logout`, { method: "POST" });
+}
+
+export const GOOGLE_LOGIN_URL = `${API_BASE}/auth/google/start`;

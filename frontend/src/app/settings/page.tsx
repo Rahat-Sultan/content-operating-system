@@ -8,14 +8,10 @@ import {
   ApiKeyState,
   fetchApiKeys,
   fetchPlatformSettings,
-  fetchSettingsAuth,
-  loginSettings,
-  logoutSettings,
   PlatformSetting,
   removeApiKey,
   saveApiKey,
   savePlatformSettings,
-  setupSettingsPassword,
   testPlatformConnection,
 } from "@/lib/api";
 
@@ -225,7 +221,7 @@ function ApiKeyRow({ k }: { k: ApiKeyState }) {
   );
 }
 
-function SettingsContent({ onLock }: { onLock: () => void }) {
+function SettingsContent({ onLock: _onLock }: { onLock: () => void }) {
   const queryClient = useQueryClient();
   const { data: keys, error: keysError } = useQuery({ queryKey: ["api-keys"], queryFn: fetchApiKeys });
   const { data, isLoading, isError, error } = useQuery({ queryKey: ["platform-settings"], queryFn: fetchPlatformSettings });
@@ -242,10 +238,9 @@ function SettingsContent({ onLock }: { onLock: () => void }) {
         <div>
           <h2 className="text-2xl font-bold text-strong tracking-tight">Settings</h2>
           <p className="text-sm text-muted mt-1">
-            Your API keys and platforms. This session ends when you close the browser, or after 8 hours.
+            Your own API keys and platforms. Only you can see them.
           </p>
         </div>
-        <button className="cos-btn" onClick={onLock}>Lock settings</button>
       </div>
 
       <section className="space-y-3">
@@ -270,73 +265,8 @@ function SettingsContent({ onLock }: { onLock: () => void }) {
   );
 }
 
-function PasswordGate({ configured, lockedUntil, onDone }: { configured: boolean; lockedUntil: string | null; onDone: () => void }) {
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const busy = useMutation({
-    mutationFn: async () => {
-      if (!configured) {
-        if (password !== confirm) throw new Error("The two passwords do not match.");
-        await setupSettingsPassword(password);
-      }
-      await loginSettings(password);
-    },
-    onSuccess: () => { setError(null); setPassword(""); setConfirm(""); onDone(); },
-    onError: (e: any) => setError(e.message),
-  });
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    busy.mutate();
-  }
-  const locked = lockedUntil && new Date(lockedUntil) > new Date();
-  return (
-    <form onSubmit={submit} className="cos-card p-6 max-w-md mx-auto space-y-4" data-testid="settings-gate">
-      <div>
-        <h2 className="text-lg font-semibold text-strong">{configured ? "Enter the Settings password" : "Create a Settings password"}</h2>
-        <p className="text-xs text-muted mt-1">
-          {configured
-            ? "API keys and platform settings are locked. You will be asked again next time you open Settings."
-            : "This password protects your API keys. Use at least 10 characters. It cannot be recovered; if you forget it, the keys must be re-entered from .env."}
-        </p>
-      </div>
-      <div>
-        <span className="cos-label">Password</span>
-        <input type="password" autoComplete={configured ? "current-password" : "new-password"} className="cos-input mt-1"
-          value={password} onChange={(e) => setPassword(e.target.value)} disabled={!!locked} />
-      </div>
-      {!configured && (
-        <div>
-          <span className="cos-label">Confirm password</span>
-          <input type="password" autoComplete="new-password" className="cos-input mt-1"
-            value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-        </div>
-      )}
-      {locked && <p className="text-xs text-warn">Too many wrong attempts. Try again after {new Date(lockedUntil!).toLocaleTimeString()}.</p>}
-      {error && <p className="text-xs text-bad">{error}</p>}
-      <button type="submit" className="cos-btn-primary w-full" disabled={!password || busy.isPending || !!locked}>
-        {busy.isPending ? "Checking…" : configured ? "Unlock" : "Set password and continue"}
-      </button>
-    </form>
-  );
-}
-
 export default function SettingsPage() {
-  const queryClient = useQueryClient();
-  const { data: auth, isLoading, isError, error } = useQuery({
-    queryKey: ["settings-auth"],
-    queryFn: fetchSettingsAuth,
-    refetchOnWindowFocus: true,
-  });
-
-  async function lock() {
-    await logoutSettings();
-    queryClient.removeQueries({ queryKey: ["api-keys"] });
-    queryClient.removeQueries({ queryKey: ["platform-settings"] });
-    queryClient.invalidateQueries({ queryKey: ["settings-auth"] });
-  }
-
+  // The account login is the gate for the whole app, so Settings needs no second password.
   return (
     <div className="min-h-screen bg-canvas text-body-strong">
       <header className="cos-header">
@@ -349,18 +279,8 @@ export default function SettingsPage() {
         </div>
         <AppNav />
       </header>
-
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
-        {isLoading && <p className="text-sm text-subtle">Checking access…</p>}
-        {isError && <p className="text-sm text-bad">{(error as Error).message}</p>}
-        {auth && !auth.unlocked && (
-          <PasswordGate
-            configured={auth.configured}
-            lockedUntil={auth.locked_until}
-            onDone={() => queryClient.invalidateQueries({ queryKey: ["settings-auth"] })}
-          />
-        )}
-        {auth?.unlocked && <SettingsContent onLock={lock} />}
+        <SettingsContent onLock={() => undefined} />
       </main>
     </div>
   );
