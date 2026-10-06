@@ -408,7 +408,7 @@ export async function runStrategyDiscovery(id: string): Promise<StrategyDiscover
 }
 
 export interface CreateSourcePayload {
-  name: string;
+  name?: string | null;
   source_type?: string;
   url?: string | null;
   enabled?: boolean;

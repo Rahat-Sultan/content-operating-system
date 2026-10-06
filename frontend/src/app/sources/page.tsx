@@ -54,17 +54,14 @@ export default function SourcesPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setFormError("Source name is required.");
-      return;
-    }
     if (!formData.url.trim()) {
       setFormError("Source URL is required.");
       return;
     }
 
     createMutation.mutate({
-      name: formData.name.trim(),
+      // Blank name: the source is named after its link.
+      name: formData.name.trim() || undefined,
       source_type: formData.source_type,
       url: formData.url.trim(),
       enabled: formData.enabled,
@@ -159,7 +156,7 @@ export default function SourcesPage() {
                 >
                   <div>
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-slate-100">{source.name}</h3>
+                      <h3 className="font-semibold text-slate-100 break-all">{source.url || source.name}</h3>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
                           {source.source_type}
@@ -215,12 +212,11 @@ export default function SourcesPage() {
             <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
               <div>
                 <label className="block text-slate-300 font-medium mb-1">
-                  Source Name *
+                  Source Name <span className="text-slate-500 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. AWS Architecture Blog RSS"
+                  placeholder="Leave blank to use the link"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500"
