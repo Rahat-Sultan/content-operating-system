@@ -23,9 +23,25 @@ class LoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str | None = Field(default=None, max_length=256)
+    new_password: str = Field(min_length=1, max_length=256)
+
+
+class ForgotPasswordIn(BaseModel):
+    email: str = Field(max_length=254)
+
+
+class ResetPasswordIn(BaseModel):
+    email: str = Field(max_length=254)
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=1, max_length=256)
+
+
 def _public(user: User) -> dict:
     return {"id": str(user.id), "email": user.email, "display_name": user.display_name,
-            "auth_provider": user.auth_provider, "is_admin": user.is_admin}
+            "auth_provider": user.auth_provider, "is_admin": user.is_admin,
+            "has_password": user.password_hash is not None}
 
 
 @router.post("/register", status_code=201)
@@ -43,6 +59,25 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
 @router.post("/logout")
 def logout(response: Response, db: Session = Depends(get_db), cos_session: str | None = Cookie(default=None, alias=service.COOKIE_NAME)):
     service.logout(db, cos_session, response)
+    return {"ok": True}
+
+
+@router.post("/password")
+def change_password(body: ChangePasswordIn, db: Session = Depends(get_db), user: User = Depends(service.current_user)):
+    service.change_password(db, user, body.current_password, body.new_password)
+    return {"ok": True}
+
+
+@router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordIn, db: Session = Depends(get_db)):
+    service.request_password_reset(db, body.email)
+    # Same response whether or not the email has an account.
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+def reset_password(body: ResetPasswordIn, db: Session = Depends(get_db)):
+    service.confirm_password_reset(db, body.email, body.code, body.new_password)
     return {"ok": True}
 
 

@@ -31,3 +31,20 @@ class UserSession(Base):
     user_id: Mapped[str] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PasswordResetCode(Base):
+    """
+    A one-time 6-digit code emailed for password reset. Only its SHA-256 hash is stored.
+    Requesting a new code invalidates any earlier unused code for the same user, so a
+    user has at most one active code at a time.
+    """
+    __tablename__ = "password_reset_codes"
+
+    id: Mapped[str] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[str] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
