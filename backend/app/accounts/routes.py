@@ -37,6 +37,10 @@ class VerifyResetCodeIn(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 
 
+class UpdateProfileIn(BaseModel):
+    display_name: str = Field(min_length=1, max_length=80)
+
+
 class ResetPasswordIn(BaseModel):
     email: str = Field(max_length=254)
     code: str = Field(min_length=6, max_length=6)
@@ -65,6 +69,12 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
 def logout(response: Response, db: Session = Depends(get_db), cos_session: str | None = Cookie(default=None, alias=service.COOKIE_NAME)):
     service.logout(db, cos_session, response)
     return {"ok": True}
+
+
+@router.patch("/profile")
+def update_profile(body: UpdateProfileIn, db: Session = Depends(get_db), user: User = Depends(service.current_user)):
+    service.update_display_name(db, user, body.display_name)
+    return _public(user)
 
 
 @router.post("/password")

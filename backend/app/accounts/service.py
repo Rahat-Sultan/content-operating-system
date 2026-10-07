@@ -258,3 +258,14 @@ def confirm_password_reset(db: Session, email: str, code: str, new_password: str
         User.locked_until: None,
     })
     db.commit()
+
+
+def update_display_name(db: Session, user: User, display_name: str) -> None:
+    display_name = (display_name or "").strip()
+    if not display_name:
+        raise HTTPException(status_code=422, detail="Name cannot be empty.")
+    if len(display_name) > 80:
+        raise HTTPException(status_code=422, detail="Use at most 80 characters.")
+    db.query(User).filter(User.id == user.id).update({User.display_name: display_name})
+    db.commit()
+    db.refresh(user)

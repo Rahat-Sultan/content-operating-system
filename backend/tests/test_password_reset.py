@@ -23,6 +23,7 @@ from app.accounts.service import (
     change_password,
     confirm_password_reset,
     request_password_reset,
+    update_display_name,
     verify_password_reset_code,
 )
 from app.settings_security.crypto import hash_password, verify_password
@@ -157,6 +158,17 @@ class PasswordResetTest(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 400)
         row = self.db.query(PasswordResetCode).filter(PasswordResetCode.user_id == self.local_user.id).one()
         self.assertEqual(row.attempts, 1)
+
+    def test_update_display_name_changes_it(self):
+        update_display_name(self.db, self.local_user, "New Name")
+        self.assertEqual(self.local_user.display_name, "New Name")
+        self.db.refresh(self.local_user)
+        self.assertEqual(self.local_user.display_name, "New Name")
+
+    def test_update_display_name_rejects_empty(self):
+        with self.assertRaises(HTTPException) as ctx:
+            update_display_name(self.db, self.local_user, "   ")
+        self.assertEqual(ctx.exception.status_code, 422)
 
     def test_code_only_resets_the_requesting_users_password(self):
         code = self._request_code(self.local_user.email)
