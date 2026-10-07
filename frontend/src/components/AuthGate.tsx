@@ -179,6 +179,7 @@ function LoginScreen() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [forgot, setForgot] = useState(false);
@@ -189,6 +190,7 @@ function LoginScreen() {
     onSuccess: () => {
       setError(null);
       setPassword("");
+      setConfirmPassword("");
       queryClient.invalidateQueries({ queryKey: ["me"] });
     },
     onError: (e: any) => setError(e.message),
@@ -197,6 +199,10 @@ function LoginScreen() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (mode === "register" && password !== confirmPassword) {
+      setError("The password and its confirmation don't match.");
+      return;
+    }
     submit.mutate();
   }
 
@@ -255,8 +261,25 @@ function LoginScreen() {
                 </div>
                 {mode === "register" && <p className="mt-1 text-[11px] text-faint">At least 10 characters.</p>}
               </div>
+              {mode === "register" && (
+                <div>
+                  <span className="cos-label">Confirm password</span>
+                  <div className="mt-1">
+                    <PasswordInput
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      autoComplete="new-password"
+                      testId="register-confirm-password"
+                    />
+                  </div>
+                </div>
+              )}
               {error && <p className="text-xs text-bad">{error}</p>}
-              <button type="submit" className="cos-btn-primary w-full" disabled={submit.isPending}>
+              <button
+                type="submit"
+                className="cos-btn-primary w-full"
+                disabled={submit.isPending || (mode === "register" && !confirmPassword)}
+              >
                 {submit.isPending ? "Please wait…" : mode === "login" ? "Log in" : "Create account"}
               </button>
             </form>
