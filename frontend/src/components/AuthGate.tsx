@@ -10,6 +10,7 @@ import {
   registerAccount,
   requestPasswordReset,
   resetPassword,
+  verifyResetCode,
 } from "@/lib/api";
 import { PasswordInput } from "@/components/PasswordInput";
 
@@ -25,10 +26,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 function ForgotPasswordCard({ initialEmail, onDone }: { initialEmail: string; onDone: () => void }) {
-  const [step, setStep] = useState<"email" | "code">("email");
+  // Three steps: email -> code (checked before anything else shows) -> new password + confirm.
+  const [step, setStep] = useState<"email" | "code" | "password">("email");
   const [email, setEmail] = useState(initialEmail);
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -36,8 +39,18 @@ function ForgotPasswordCard({ initialEmail, onDone }: { initialEmail: string; on
     mutationFn: () => requestPasswordReset(email),
     onSuccess: () => {
       setError(null);
+      setCode("");
       setStep("code");
       setNotice("If that email has an account, a 6-digit code is on its way. It expires in 10 minutes.");
+    },
+    onError: (e: any) => setError(e.message),
+  });
+
+  const verify = useMutation({
+    mutationFn: () => verifyResetCode(email, code),
+    onSuccess: () => {
+      setError(null);
+      setStep("password");
     },
     onError: (e: any) => setError(e.message),
   });
@@ -54,7 +67,8 @@ function ForgotPasswordCard({ initialEmail, onDone }: { initialEmail: string; on
   return (
     <div className="cos-card p-5 space-y-3" data-testid="forgot-password-form">
       <h2 className="text-sm font-semibold text-body-strong">Reset your password</h2>
-      {step === "email" ? (
+
+      {step === "email" && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -75,12 +89,14 @@ function ForgotPasswordCard({ initialEmail, onDone }: { initialEmail: string; on
             Back to log in
           </button>
         </form>
-      ) : (
+      )}
+
+      {step === "code" && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
-            confirm.mutate();
+            verify.mutate();
           }}
           className="space-y-3"
         >
@@ -98,16 +114,9 @@ function ForgotPasswordCard({ initialEmail, onDone }: { initialEmail: string; on
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             />
           </div>
-          <div>
-            <span className="cos-label">New password</span>
-            <div className="mt-1">
-              <PasswordInput value={newPassword} onChange={setNewPassword} autoComplete="new-password" />
-            </div>
-            <p className="mt-1 text-[11px] text-faint">At least 10 characters.</p>
-          </div>
           {error && <p className="text-xs text-bad">{error}</p>}
-          <button type="submit" className="cos-btn-primary w-full" disabled={confirm.isPending || code.length !== 6}>
-            {confirm.isPending ? "Resetting…" : "Reset password"}
+          <button type="submit" className="cos-btn-primary w-full" disabled={verify.isPending || code.length !== 6}>
+            {verify.isPending ? "Checking…" : "Verify code"}
           </button>
           <div className="flex items-center justify-between text-xs">
             <button type="button" onClick={() => setStep("email")} className="text-muted hover:text-body-strong">
@@ -122,6 +131,43 @@ function ForgotPasswordCard({ initialEmail, onDone }: { initialEmail: string; on
               {request.isPending ? "Sending…" : "Resend code"}
             </button>
           </div>
+        </form>
+      )}
+
+      {step === "password" && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            if (newPassword !== confirmPassword) {
+              setError("The new password and its confirmation don't match.");
+              return;
+            }
+            confirm.mutate();
+          }}
+          className="space-y-3"
+        >
+          <p className="text-xs text-good">Code verified. Choose a new password.</p>
+          <div>
+            <span className="cos-label">New password</span>
+            <div className="mt-1">
+              <PasswordInput value={newPassword} onChange={setNewPassword} autoComplete="new-password" testId="reset-new-password" />
+            </div>
+            <p className="mt-1 text-[11px] text-faint">At least 10 characters.</p>
+          </div>
+          <div>
+            <span className="cos-label">Confirm new password</span>
+            <div className="mt-1">
+              <PasswordInput value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" testId="reset-confirm-password" />
+            </div>
+          </div>
+          {error && <p className="text-xs text-bad">{error}</p>}
+          <button type="submit" className="cos-btn-primary w-full" disabled={confirm.isPending || !newPassword || !confirmPassword}>
+            {confirm.isPending ? "Resetting…" : "Reset password"}
+          </button>
+          <button type="button" onClick={() => setStep("code")} className="text-xs text-muted hover:text-body-strong w-full text-center">
+            Back
+          </button>
         </form>
       )}
     </div>

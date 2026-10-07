@@ -908,3 +908,13 @@ export async function resetPassword(email: string, code: string, new_password: s
   if (!res.ok) throw await errorFrom(res, "Could not reset the password.");
   return res.json();
 }
+
+export async function verifyResetCode(email: string, code: string) {
+  const res = await apiFetch(`${API_BASE}/auth/verify-reset-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not verify the code.");
+  return res.json();
+}

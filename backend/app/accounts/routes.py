@@ -32,6 +32,11 @@ class ForgotPasswordIn(BaseModel):
     email: str = Field(max_length=254)
 
 
+class VerifyResetCodeIn(BaseModel):
+    email: str = Field(max_length=254)
+    code: str = Field(min_length=6, max_length=6)
+
+
 class ResetPasswordIn(BaseModel):
     email: str = Field(max_length=254)
     code: str = Field(min_length=6, max_length=6)
@@ -72,6 +77,12 @@ def change_password(body: ChangePasswordIn, db: Session = Depends(get_db), user:
 def forgot_password(body: ForgotPasswordIn, db: Session = Depends(get_db)):
     service.request_password_reset(db, body.email)
     # Same response whether or not the email has an account.
+    return {"ok": True}
+
+
+@router.post("/verify-reset-code")
+def verify_reset_code(body: VerifyResetCodeIn, db: Session = Depends(get_db)):
+    service.verify_password_reset_code(db, body.email, body.code)
     return {"ok": True}
 
 

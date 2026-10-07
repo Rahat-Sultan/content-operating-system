@@ -23,6 +23,7 @@ from app.accounts.service import (
     change_password,
     confirm_password_reset,
     request_password_reset,
+    verify_password_reset_code,
 )
 from app.settings_security.crypto import hash_password, verify_password
 
@@ -140,6 +141,22 @@ class PasswordResetTest(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             request_password_reset(self.db, self.local_user.email)
         self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_verify_accepts_the_correct_code_without_consuming_it(self):
+        code = self._request_code(self.local_user.email)
+        verify_password_reset_code(self.db, self.local_user.email, code)
+        # Still usable afterwards: verifying does not spend the code.
+        confirm_password_reset(self.db, self.local_user.email, code, "reset-password-123")
+        self.db.refresh(self.local_user)
+        self.assertTrue(verify_password("reset-password-123", self.local_user.password_hash))
+
+    def test_verify_rejects_a_wrong_code_and_counts_as_an_attempt(self):
+        self._request_code(self.local_user.email)
+        with self.assertRaises(HTTPException) as ctx:
+            verify_password_reset_code(self.db, self.local_user.email, "000000")
+        self.assertEqual(ctx.exception.status_code, 400)
+        row = self.db.query(PasswordResetCode).filter(PasswordResetCode.user_id == self.local_user.id).one()
+        self.assertEqual(row.attempts, 1)
 
     def test_code_only_resets_the_requesting_users_password(self):
         code = self._request_code(self.local_user.email)

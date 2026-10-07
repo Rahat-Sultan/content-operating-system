@@ -194,6 +194,36 @@ def request_password_reset(db: Session, email: str) -> None:
     send_reset_code(user.email, code)
 
 
+def _active_reset_code(db: Session, user: User) -> PasswordResetCode | None:
+    return (
+        db.query(PasswordResetCode)
+        .filter(PasswordResetCode.user_id == user.id, PasswordResetCode.used_at.is_(None),
+                PasswordResetCode.expires_at > _now())
+        .order_by(PasswordResetCode.created_at.desc())
+        .first()
+    )
+
+
+def verify_password_reset_code(db: Session, email: str, code: str) -> None:
+    """
+    Checks the code without consuming it, so the UI can reveal the new-password step only
+    after a correct code. A wrong guess still counts against the attempt limit.
+    """
+    email = normalize_email(email)
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=400, detail=GENERIC_RESET_ERROR)
+    row = _active_reset_code(db, user)
+    if row is None or row.attempts >= RESET_CODE_MAX_ATTEMPTS:
+        raise HTTPException(status_code=400, detail=GENERIC_RESET_ERROR)
+    if row.code_hash != token_hash((code or "").strip()):
+        db.query(PasswordResetCode).filter(PasswordResetCode.id == row.id).update(
+            {PasswordResetCode.attempts: PasswordResetCode.attempts + 1}
+        )
+        db.commit()
+        raise HTTPException(status_code=400, detail=GENERIC_RESET_ERROR)
+
+
 def confirm_password_reset(db: Session, email: str, code: str, new_password: str) -> None:
     email = normalize_email(email)
     if len(new_password) < MIN_PASSWORD_LENGTH:
@@ -202,13 +232,7 @@ def confirm_password_reset(db: Session, email: str, code: str, new_password: str
     if user is None:
         raise HTTPException(status_code=400, detail=GENERIC_RESET_ERROR)
 
-    row = (
-        db.query(PasswordResetCode)
-        .filter(PasswordResetCode.user_id == user.id, PasswordResetCode.used_at.is_(None),
-                PasswordResetCode.expires_at > _now())
-        .order_by(PasswordResetCode.created_at.desc())
-        .first()
-    )
+    row = _active_reset_code(db, user)
     if row is None:
         raise HTTPException(status_code=400, detail=GENERIC_RESET_ERROR)
     if row.attempts >= RESET_CODE_MAX_ATTEMPTS:
