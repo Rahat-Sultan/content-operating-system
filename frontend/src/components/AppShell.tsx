@@ -57,6 +57,7 @@ const NAV: NavGroup[] = [
         label: "Settings",
         href: "/settings",
         children: [
+          { label: "Account", href: "/settings#account" },
           { label: "Platforms", href: "/settings#platforms" },
           { label: "API keys", href: "/settings#api-keys" },
         ],

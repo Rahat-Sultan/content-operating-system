@@ -804,6 +804,7 @@ export interface Account {
   display_name: string | null;
   auth_provider: string;
   is_admin: boolean;
+  has_password: boolean;
 }
 
 export interface AuthProviders {
@@ -875,5 +876,35 @@ export async function fetchSourceSuggestions(): Promise<SourceSuggestion[]> {
 export async function selectIdea(id: string) {
   const res = await apiFetch(`${API_BASE}/ideas/${id}/select`, { method: "POST" });
   if (!res.ok) throw await errorFrom(res, "Could not select the idea.");
+  return res.json();
+}
+
+export async function changePassword(current_password: string | null, new_password: string) {
+  const res = await apiFetch(`${API_BASE}/auth/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not change the password.");
+  return res.json();
+}
+
+export async function requestPasswordReset(email: string) {
+  const res = await apiFetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not request a reset code.");
+  return res.json();
+}
+
+export async function resetPassword(email: string, code: string, new_password: string) {
+  const res = await apiFetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code, new_password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not reset the password.");
   return res.json();
 }

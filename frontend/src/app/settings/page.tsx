@@ -3,9 +3,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlatformLogo } from "@/components/PlatformBadge";
+import { PasswordInput } from "@/components/PasswordInput";
 import {
   ApiKeyState,
+  changePassword,
   fetchApiKeys,
+  fetchMe,
   fetchPlatformSettings,
   PlatformSetting,
   removeApiKey,
@@ -157,6 +160,94 @@ function PlatformCard({ p }: { p: PlatformSetting }) {
   );
 }
 
+function AccountSection() {
+  const queryClient = useQueryClient();
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const save = useMutation({
+    mutationFn: () => changePassword(me?.has_password ? current : null, next),
+    onSuccess: () => {
+      setError(null);
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      setDone(true);
+      setTimeout(() => setDone(false), 2500);
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+    onError: (e: any) => setError(e.message),
+  });
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (next !== confirm) {
+      setError("The new password and its confirmation don't match.");
+      return;
+    }
+    save.mutate();
+  }
+
+  if (!me) return null;
+
+  return (
+    <section id="account" className="scroll-mt-20 space-y-3">
+      <h3 className="cos-label">Account</h3>
+      <div className="cos-card p-4 space-y-1">
+        <p className="text-sm text-body-strong">{me.display_name ?? me.email}</p>
+        <p className="text-xs text-subtle">{me.email}</p>
+        <p className="text-[11px] text-faint">
+          {me.auth_provider === "google" ? "Signed in with Google" : "Local account"}
+          {!me.has_password && " · no password set yet"}
+        </p>
+      </div>
+
+      <form onSubmit={onSubmit} className="cos-card p-4 space-y-3" data-testid="change-password-form">
+        <h4 className="text-sm font-semibold text-body-strong">
+          {me.has_password ? "Change password" : "Set a password"}
+        </h4>
+        {!me.has_password && (
+          <p className="text-xs text-muted">
+            Your account signed in with Google and has no password yet. Set one to also log in with email and password.
+          </p>
+        )}
+        {me.has_password && (
+          <div>
+            <span className="cos-label">Current password</span>
+            <div className="mt-1">
+              <PasswordInput value={current} onChange={setCurrent} autoComplete="current-password" testId="current-password" />
+            </div>
+          </div>
+        )}
+        <div>
+          <span className="cos-label">New password</span>
+          <div className="mt-1">
+            <PasswordInput value={next} onChange={setNext} autoComplete="new-password" testId="new-password" />
+          </div>
+          <p className="mt-1 text-[11px] text-faint">At least 10 characters.</p>
+        </div>
+        <div>
+          <span className="cos-label">Confirm new password</span>
+          <div className="mt-1">
+            <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" testId="confirm-password" />
+          </div>
+        </div>
+        {error && <p className="text-xs text-bad">{error}</p>}
+        <div className="flex justify-end">
+          <button type="submit" className="cos-btn-primary" disabled={save.isPending || !next || !confirm}>
+            {save.isPending ? "Saving…" : done ? "Saved" : me.has_password ? "Change password" : "Set password"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 function ApiKeyRow({ k }: { k: ApiKeyState }) {
   const queryClient = useQueryClient();
   const [value, setValue] = useState("");
@@ -241,6 +332,8 @@ function SettingsContent({ onLock: _onLock }: { onLock: () => void }) {
           </p>
         </div>
       </div>
+
+      <AccountSection />
 
       <section id="api-keys" className="scroll-mt-20 space-y-3">
         <h3 className="cos-label">API keys</h3>
