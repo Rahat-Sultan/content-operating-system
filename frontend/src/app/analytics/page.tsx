@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAnalyticsSummary, AnalyticsSummaryPost } from "@/lib/api";
 import { PlatformBadge, platformLabel } from "@/components/PlatformBadge";
+import { Greeting } from "@/components/Greeting";
 
 const BAR = "#3987e5"; // reference dark categorical slot 1, validated on the app surface
 const ALL = "all";
@@ -74,6 +75,7 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-canvas text-body-strong p-4 sm:p-6 space-y-6">
       <header className="flex items-center justify-between">
         <div>
+          <Greeting text={(name) => `Hello ${name}, here is your analytics.`} />
           <h1 className="text-xl font-bold text-strong">Analytics</h1>
           <p className="text-xs text-subtle">Newest valid snapshot per published post, by platform</p>
         </div>

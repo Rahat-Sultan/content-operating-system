@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { fetchSources, createSource, fetchSourceSuggestions, SourceOption, CreateSourcePayload } from "@/lib/api";
+import { Greeting } from "@/components/Greeting";
 
 export default function SourcesPage() {
   const queryClient = useQueryClient();
@@ -100,6 +101,7 @@ export default function SourcesPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-line">
           <div>
+            <Greeting text={(name) => `Hello ${name}, here are your sources.`} />
             <h2 className="text-2xl font-bold text-strong tracking-tight">Signal Sources</h2>
             <p className="text-sm text-muted mt-1">
               Configure external feeds and content channels that feed into discovery strategies.

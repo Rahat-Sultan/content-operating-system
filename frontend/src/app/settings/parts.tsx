@@ -15,6 +15,7 @@ import {
   saveApiKey,
   savePlatformSettings,
   testPlatformConnection,
+  updateDisplayName,
 } from "@/lib/api";
 
 // Shared pieces for the three Settings pages (Account, Platforms, API keys).
@@ -177,6 +178,68 @@ export function PlatformsSection() {
   );
 }
 
+function NameRow({ me }: { me: { display_name: string | null; email: string } }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(me.display_name ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: () => updateDisplayName(name),
+    onSuccess: () => {
+      setError(null);
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+    },
+    onError: (e: any) => setError(e.message),
+  });
+
+  if (!editing) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-body-strong">{me.display_name ?? me.email}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setName(me.display_name ?? "");
+            setEditing(true);
+          }}
+          className="text-[11px] font-semibold text-accent-text hover:underline"
+        >
+          Edit name
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError(null);
+        save.mutate();
+      }}
+      className="flex items-center gap-2"
+      data-testid="name-form"
+    >
+      <input
+        className="cos-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoFocus
+        maxLength={80}
+      />
+      <button type="submit" className="cos-btn-primary whitespace-nowrap" disabled={save.isPending || !name.trim()}>
+        {save.isPending ? "Saving…" : "Save"}
+      </button>
+      <button type="button" className="cos-btn whitespace-nowrap" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+      {error && <p className="text-xs text-bad">{error}</p>}
+    </form>
+  );
+}
+
 export function AccountSection() {
   const queryClient = useQueryClient();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
@@ -215,7 +278,7 @@ export function AccountSection() {
   return (
     <section className="space-y-3">
       <div className="cos-card p-4 space-y-1">
-        <p className="text-sm text-body-strong">{me.display_name ?? me.email}</p>
+        <NameRow me={me} />
         <p className="text-xs text-subtle">{me.email}</p>
         <p className="text-[11px] text-faint">
           {me.auth_provider === "google" ? "Signed in with Google" : "Local account"}

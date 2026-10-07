@@ -918,3 +918,13 @@ export async function verifyResetCode(email: string, code: string) {
   if (!res.ok) throw await errorFrom(res, "Could not verify the code.");
   return res.json();
 }
+
+export async function updateDisplayName(display_name: string): Promise<Account> {
+  const res = await apiFetch(`${API_BASE}/auth/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not update the name.");
+  return res.json();
+}
