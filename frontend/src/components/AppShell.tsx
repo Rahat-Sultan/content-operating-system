@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchMe, logoutAccount } from "@/lib/api";
 
@@ -189,22 +189,155 @@ function NavList({
   );
 }
 
+function initialsOf(me: { display_name: string | null; email: string }): string {
+  const source = (me.display_name || me.email.split("@")[0]).trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  const chars = parts.length >= 2 ? [parts[0][0], parts[1][0]] : [source.slice(0, 2)];
+  return chars.join("").toUpperCase().slice(0, 2);
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+    </svg>
+  );
+}
+
+function AdminIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+    </svg>
+  );
+}
+
+// A door panel with an arrow walking out through it.
+function LogoutDoorIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
 function AccountFooter() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
   const logout = useMutation({
     mutationFn: logoutAccount,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   if (!me) return null;
+
+  function go(href: string) {
+    setOpen(false);
+    router.push(href);
+  }
+
   return (
-    <div className="border-t border-line pt-4 px-3 flex items-center justify-between gap-3">
-      <span className="text-xs text-muted truncate" data-testid="account-email">
-        {me.display_name ?? me.email}
-      </span>
-      <button onClick={() => logout.mutate()} className="text-xs font-semibold text-body hover:text-strong shrink-0">
-        Log out
+    <div ref={ref} className="relative border-t border-line pt-3 px-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-raised"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">
+          {initialsOf(me)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-body-strong" data-testid="account-email">
+            {me.display_name ?? me.email}
+          </span>
+          <span className="block truncate text-[11px] text-subtle">{me.is_admin ? "Admin" : "Member"}</span>
+        </span>
+        <ChevronRightIcon />
       </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-line bg-panel shadow-xl shadow-black/40 py-1.5 overflow-hidden"
+        >
+          <button
+            type="button"
+            onClick={() => go("/settings/account")}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-raised"
+            role="menuitem"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">
+              {initialsOf(me)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-body-strong">{me.display_name ?? me.email}</span>
+              <span className="block truncate text-[11px] text-subtle">{me.is_admin ? "Admin" : "Member"}</span>
+            </span>
+            <ChevronRightIcon />
+          </button>
+
+          <div className="my-1.5 border-t border-line" />
+
+          <button type="button" onClick={() => go("/settings/account")} role="menuitem"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-body hover:bg-raised">
+            <SettingsIcon />
+            Settings
+          </button>
+          {me.is_admin && (
+            <button type="button" onClick={() => go("/admin")} role="menuitem"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-body hover:bg-raised">
+              <AdminIcon />
+              Admin
+            </button>
+          )}
+
+          <div className="my-1.5 border-t border-line" />
+
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              logout.mutate();
+            }}
+            role="menuitem"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-body hover:bg-raised"
+          >
+            <LogoutDoorIcon />
+            Log out
+          </button>
+        </div>
+      )}
     </div>
   );
 }
