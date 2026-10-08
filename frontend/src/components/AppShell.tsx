@@ -17,54 +17,60 @@ type NavItem = {
 type NavGroup = { label: string; items: NavItem[] };
 
 // One menu for every page. Add a page here and it appears on every screen size.
-const NAV: NavGroup[] = [
-  {
-    label: "Create",
-    items: [
-      {
-        label: "Ideas",
-        href: "/ideas",
-        children: [
-          {
-            label: "Board",
-            href: "/ideas",
-            match: (p, q) => p === "/ideas" && q.get("view") !== "archive",
-          },
-          {
-            label: "Archive",
-            href: "/ideas?view=archive",
-            match: (p, q) => p === "/ideas" && q.get("view") === "archive",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    label: "Plan",
-    items: [
-      { label: "Strategies", href: "/strategies" },
-      { label: "Sources", href: "/sources" },
-    ],
-  },
-  {
-    label: "Results",
-    items: [{ label: "Analytics", href: "/analytics" }],
-  },
-  {
-    label: "Account",
-    items: [
-      {
-        label: "Settings",
-        href: "/settings",
-        children: [
-          { label: "Account", href: "/settings/account" },
-          { label: "Platforms", href: "/settings/platforms" },
-          { label: "API keys", href: "/settings/api-keys" },
-        ],
-      },
-    ],
-  },
-];
+function buildNav(isAdmin: boolean): NavGroup[] {
+  const groups: NavGroup[] = [
+    {
+      label: "Create",
+      items: [
+        {
+          label: "Ideas",
+          href: "/ideas",
+          children: [
+            {
+              label: "Board",
+              href: "/ideas",
+              match: (p, q) => p === "/ideas" && q.get("view") !== "archive",
+            },
+            {
+              label: "Archive",
+              href: "/ideas?view=archive",
+              match: (p, q) => p === "/ideas" && q.get("view") === "archive",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      label: "Plan",
+      items: [
+        { label: "Strategies", href: "/strategies" },
+        { label: "Sources", href: "/sources" },
+      ],
+    },
+    {
+      label: "Results",
+      items: [{ label: "Analytics", href: "/analytics" }],
+    },
+    {
+      label: "Account",
+      items: [
+        {
+          label: "Settings",
+          href: "/settings",
+          children: [
+            { label: "Account", href: "/settings/account" },
+            { label: "Platforms", href: "/settings/platforms" },
+            { label: "API keys", href: "/settings/api-keys" },
+          ],
+        },
+      ],
+    },
+  ];
+  if (isAdmin) {
+    groups.push({ label: "Admin", items: [{ label: "Users", href: "/admin" }] });
+  }
+  return groups;
+}
 
 function isActive(item: NavItem, pathname: string, query: URLSearchParams): boolean {
   if (item.match) return item.match(pathname, query);
@@ -158,15 +164,18 @@ function NavRow({
 function NavList({
   pathname,
   query,
+  isAdmin,
   onNavigate,
 }: {
   pathname: string;
   query: URLSearchParams;
+  isAdmin: boolean;
   onNavigate?: () => void;
 }) {
+  const nav = buildNav(isAdmin);
   return (
     <nav aria-label="Main" className="space-y-6">
-      {NAV.map((group) => (
+      {nav.map((group) => (
         <div key={group.label}>
           <p className="cos-label px-3 pb-2">{group.label}</p>
           <div className="space-y-0.5">
@@ -205,6 +214,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const query = new URLSearchParams(searchParams?.toString() ?? "");
   const [open, setOpen] = useState(false);
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
+  const isAdmin = me?.is_admin ?? false;
 
   // Close the drawer after navigating and on Escape.
   useEffect(() => setOpen(false), [pathname, searchParams]);
@@ -223,7 +234,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           Content OS
         </Link>
         <div className="flex-1 overflow-y-auto">
-          <NavList pathname={pathname} query={query} />
+          <NavList pathname={pathname} query={query} isAdmin={isAdmin} />
         </div>
         <AccountFooter />
       </aside>
@@ -270,7 +281,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
             <div className="flex-1">
-              <NavList pathname={pathname} query={query} onNavigate={() => setOpen(false)} />
+              <NavList pathname={pathname} query={query} isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
             </div>
             <AccountFooter />
           </div>

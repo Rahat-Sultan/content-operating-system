@@ -966,3 +966,29 @@ export async function lockVault() {
   if (!res.ok) throw await errorFrom(res, "Could not lock settings.");
   return res.json();
 }
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  name: string | null;
+  sign_in: string;
+  is_admin: boolean;
+  created_at: string;
+  posts: number;
+  ideas: number;
+  storage_mb: number;
+  storage_limit_mb: number;
+  storage_percent: number;
+}
+
+export interface AdminUsersResponse {
+  accounts: number;
+  storage_limit_mb_per_account: number;
+  users: AdminUserRow[];
+}
+
+export async function fetchAdminUsers(): Promise<AdminUsersResponse> {
+  const res = await apiFetch(`${API_BASE}/admin/users`);
+  if (!res.ok) throw await errorFrom(res, "Could not load the admin user list.");
+  return res.json();
+}
