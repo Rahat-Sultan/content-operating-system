@@ -208,6 +208,13 @@ class PublishingService:
                     "attempts": attempts,
                 }
                 publication.error = None
+                # The idea moves to Published in the same commit as the publication.
+                from app.ideas.lifecycle import advance_idea
+                from app.ideas.models import IdeaStatus
+                advance_idea(
+                    db, run.idea_id, run.owner_id, IdeaStatus.PUBLISHED,
+                    [IdeaStatus.NEW, IdeaStatus.SELECTED, IdeaStatus.IN_PROGRESS],
+                )
                 db.commit()
                 db.refresh(publication)
 

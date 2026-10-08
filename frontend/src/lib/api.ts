@@ -804,6 +804,7 @@ export interface Account {
   display_name: string | null;
   auth_provider: string;
   is_admin: boolean;
+  has_password: boolean;
 }
 
 export interface AuthProviders {
@@ -855,5 +856,139 @@ export async function retryPublish(workflowRunId: string): Promise<WorkflowRunRe
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `Retry failed (HTTP ${res.status})`);
   }
+  return res.json();
+}
+
+export interface SourceSuggestion {
+  name: string;
+  url: string;
+  topic: string;
+}
+
+export async function fetchSourceSuggestions(): Promise<SourceSuggestion[]> {
+  const res = await apiFetch(`${API_BASE}/sources/suggestions`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch suggestions: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function selectIdea(id: string) {
+  const res = await apiFetch(`${API_BASE}/ideas/${id}/select`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not select the idea.");
+  return res.json();
+}
+
+export async function changePassword(current_password: string | null, new_password: string) {
+  const res = await apiFetch(`${API_BASE}/auth/password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not change the password.");
+  return res.json();
+}
+
+export async function requestPasswordReset(email: string) {
+  const res = await apiFetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not request a reset code.");
+  return res.json();
+}
+
+export async function resetPassword(email: string, code: string, new_password: string) {
+  const res = await apiFetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code, new_password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not reset the password.");
+  return res.json();
+}
+
+export async function verifyResetCode(email: string, code: string) {
+  const res = await apiFetch(`${API_BASE}/auth/verify-reset-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not verify the code.");
+  return res.json();
+}
+
+export async function updateDisplayName(display_name: string): Promise<Account> {
+  const res = await apiFetch(`${API_BASE}/auth/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not update the name.");
+  return res.json();
+}
+
+export interface VaultStatus {
+  configured: boolean;
+  unlocked: boolean;
+  unlocked_until: string | null;
+}
+
+export async function fetchVaultStatus(): Promise<VaultStatus> {
+  const res = await apiFetch(`${API_BASE}/settings/vault/status`);
+  if (!res.ok) throw await errorFrom(res, "Could not check the settings lock.");
+  return res.json();
+}
+
+export async function setVaultPassword(current_password: string | null, new_password: string) {
+  const res = await apiFetch(`${API_BASE}/settings/vault/set`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not set the settings password.");
+  return res.json();
+}
+
+export async function unlockVault(password: string): Promise<{ unlocked_until: string }> {
+  const res = await apiFetch(`${API_BASE}/settings/vault/unlock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Wrong settings password.");
+  return res.json();
+}
+
+export async function lockVault() {
+  const res = await apiFetch(`${API_BASE}/settings/vault/lock`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not lock settings.");
+  return res.json();
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  name: string | null;
+  sign_in: string;
+  is_admin: boolean;
+  created_at: string;
+  posts: number;
+  ideas: number;
+  storage_mb: number;
+  storage_limit_mb: number;
+  storage_percent: number;
+}
+
+export interface AdminUsersResponse {
+  accounts: number;
+  storage_limit_mb_per_account: number;
+  users: AdminUserRow[];
+}
+
+export async function fetchAdminUsers(): Promise<AdminUsersResponse> {
+  const res = await apiFetch(`${API_BASE}/admin/users`);
+  if (!res.ok) throw await errorFrom(res, "Could not load the admin user list.");
   return res.json();
 }

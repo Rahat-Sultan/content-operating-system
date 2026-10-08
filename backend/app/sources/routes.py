@@ -37,6 +37,16 @@ def list_sources_endpoint(
     return db.query(Source).filter(Source.owner_id == user.id).order_by(Source.created_at.desc()).all()
 
 
+@router.get("/suggestions")
+def list_source_suggestions(
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    """Suggested feeds this account does not have yet. Adding one uses the normal create route."""
+    from app.sources.catalog import suggestions_for
+    return suggestions_for(db, user.id)
+
+
 @router.post("", response_model=SourceResponse, status_code=status.HTTP_201_CREATED)
 def create_source_endpoint(
     request: CreateSourceRequest,

@@ -3,9 +3,11 @@
 import { ScrollX } from "@/components/ScrollX";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAnalyticsSummary, AnalyticsSummaryPost } from "@/lib/api";
+import { fetchAnalyticsSummary, AnalyticsSummary, AnalyticsSummaryPost, PlatformBreakdown } from "@/lib/api";
 import { PlatformBadge, platformLabel } from "@/components/PlatformBadge";
+import { Greeting } from "@/components/Greeting";
 
 const BAR = "#3987e5"; // reference dark categorical slot 1, validated on the app surface
 const ALL = "all";
@@ -16,6 +18,137 @@ function fmtDate(iso?: string | null) {
   const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
     .formatToParts(d).find((p) => p.type === "timeZoneName")?.value ?? "";
   return `${d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })} ${zone}`.trim();
+}
+
+/**
+ * Total interactions (reactions + comments + clicks + shares) per platform, across every
+ * post with collected metrics. One series, directly labeled by platform, so no legend.
+ */
+type SummaryWithPlatforms = AnalyticsSummary & { platform: string | null; platforms: PlatformBreakdown[] };
+
+function PlatformInteractionsChart({ data }: { data: SummaryWithPlatforms }) {
+  const [hover, setHover] = useState<string | null>(null);
+  const [asTable, setAsTable] = useState(false);
+
+  const rows = data.platforms.map((p) => {
+    const posts = data.posts.filter((post) => post.platform === p.key && post.has_snapshot);
+    const totals = posts.reduce(
+      (acc, post) => ({
+        reactions: acc.reactions + (post.reactions ?? 0),
+        comments: acc.comments + (post.comments ?? 0),
+        clicks: acc.clicks + (post.clicks ?? 0),
+        shares: acc.shares + (post.shares ?? 0),
+      }),
+      { reactions: 0, comments: 0, clicks: 0, shares: 0 }
+    );
+    const interactions = totals.reactions + totals.comments + totals.clicks + totals.shares;
+    return { key: p.key, label: platformLabel(p.key), interactions, totals, postCount: posts.length };
+  });
+
+  if (!rows.some((r) => r.postCount > 0)) return null;
+
+  const max = Math.max(1, ...rows.map((r) => r.interactions));
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(max * f));
+
+  return (
+    <section className="p-4 rounded-xl bg-panel/50 border border-line space-y-3" data-testid="platform-interactions-chart">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-[11px] font-semibold text-muted">Interactions by platform</h3>
+          <p className="text-[11px] text-faint">Reactions + comments + clicks + shares, across posts with collected metrics.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAsTable((v) => !v)}
+          className="text-[11px] font-semibold text-accent-text hover:underline shrink-0"
+        >
+          {asTable ? "View as chart" : "View as table"}
+        </button>
+      </div>
+
+      {asTable ? (
+        <table className="w-full text-left text-xs font-mono">
+          <thead className="text-[10px] uppercase text-subtle border-b border-line">
+            <tr>
+              <th className="py-1.5 pr-3">Platform</th>
+              <th className="py-1.5 px-3 text-right">Interactions</th>
+              <th className="py-1.5 px-3 text-right">Reactions</th>
+              <th className="py-1.5 px-3 text-right">Comments</th>
+              <th className="py-1.5 px-3 text-right">Clicks</th>
+              <th className="py-1.5 pl-3 text-right">Shares</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td className="py-1.5 pr-3 text-body-strong">{r.label}</td>
+                <td className="py-1.5 px-3 text-right text-strong font-semibold">{r.interactions}</td>
+                <td className="py-1.5 px-3 text-right text-muted">{r.totals.reactions}</td>
+                <td className="py-1.5 px-3 text-right text-muted">{r.totals.comments}</td>
+                <td className="py-1.5 px-3 text-right text-muted">{r.totals.clicks}</td>
+                <td className="py-1.5 pl-3 text-right text-muted">{r.totals.shares}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="flex gap-2" role="img" aria-label={`Interactions by platform: ${rows.map((r) => `${r.label} ${r.interactions}`).join(", ")}`}>
+          {/* Y axis: interaction count, hairline ticks. */}
+          <div className="flex flex-col justify-between text-right font-mono text-[10px] text-faint pb-6 pt-5 shrink-0">
+            {[...ticks].reverse().map((t) => (
+              <span key={t}>{t}</span>
+            ))}
+          </div>
+          <div className="flex-1 border-l border-line relative pl-3">
+            {/* Gridlines, recessive, hairline, solid. */}
+            <div className="absolute inset-0 left-3 flex flex-col justify-between pb-6 pt-[9px] pointer-events-none">
+              {ticks.map((t) => (
+                <div key={t} className="border-t border-line/60" />
+              ))}
+            </div>
+            {/* Bars, baseline at bottom, X axis: platform name below each bar. */}
+            {/* No items-end here: each column must stretch to h-40 so its flex-1 bar
+                track has real height to grow into (the bar itself bottom-anchors below). */}
+            <div className="relative flex gap-3 h-40">
+              {rows.map((r) => {
+                const h = Math.round((r.interactions / max) * 100);
+                return (
+                  <div
+                    key={r.key}
+                    className="relative flex-1 flex flex-col items-center gap-1.5 min-w-0"
+                    onMouseEnter={() => setHover(r.key)}
+                    onMouseLeave={() => setHover(null)}
+                  >
+                    <span className="text-[11px] font-mono font-semibold text-body-strong tabular-nums">
+                      {r.postCount > 0 ? r.interactions : ""}
+                    </span>
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className="w-full max-w-6 mx-auto rounded-t"
+                        style={{
+                          height: `${Math.max(h, r.interactions > 0 ? 2 : 0)}%`,
+                          background: BAR,
+                          opacity: hover === null || hover === r.key ? 1 : 0.55,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono text-subtle truncate max-w-full" title={r.label}>
+                      {r.label}
+                    </span>
+                    {hover === r.key && (
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-44 px-2 py-1 rounded bg-canvas border border-line-strong text-[10px] font-mono text-body-strong shadow-lg text-center z-10">
+                        {r.label}: {r.interactions} ({r.totals.reactions} reactions, {r.totals.comments} comments, {r.totals.clicks} clicks, {r.totals.shares} shares)
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
 /** One series, so no legend. Bars are labeled with their value; hover shows the post. */
@@ -60,7 +193,17 @@ function ImpressionsBars({ posts }: { posts: AnalyticsSummaryPost[] }) {
 
 export default function AnalyticsPage() {
   const [includeTest, setIncludeTest] = useState(false);
-  const [tab, setTab] = useState<string>(ALL);
+  // The selected platform lives in the URL, so a reload (or a shared link) stays on it.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("platform") || ALL;
+  function setTab(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === ALL) params.delete("platform");
+    else params.set("platform", next);
+    const qs = params.toString();
+    router.replace(qs ? `/analytics?${qs}` : "/analytics");
+  }
   const platformParam = tab === ALL ? undefined : tab;
   const { data, isLoading, error } = useQuery({
     queryKey: ["analytics-summary", includeTest, platformParam ?? ALL],
@@ -74,6 +217,7 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-canvas text-body-strong p-4 sm:p-6 space-y-6">
       <header className="flex items-center justify-between">
         <div>
+          <Greeting text={(name) => `Hello ${name}, here is your analytics.`} />
           <h1 className="text-xl font-bold text-strong">Analytics</h1>
           <p className="text-xs text-subtle">Newest valid snapshot per published post, by platform</p>
         </div>
@@ -122,6 +266,8 @@ export default function AnalyticsPage() {
               </div>
             ))}
           </section>
+
+          {tab === ALL && <PlatformInteractionsChart data={data} />}
 
           <label className="flex items-center space-x-2 text-xs text-muted">
             <input type="checkbox" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)} />

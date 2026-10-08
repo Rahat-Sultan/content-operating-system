@@ -40,4 +40,8 @@ class Analytics(Base):
             unique=True,
             postgresql_where=text("((metrics->>'is_initial')::boolean IS TRUE)"),
         ),
+        # Every "snapshots for this post" and "latest snapshot per post" query filters on
+        # publication_id and orders by collected_at; without this, both were a full scan.
+        # A plain ascending index serves the DESC order too (Postgres scans it backward).
+        Index("ix_analytics_publication_id_collected_at", "publication_id", "collected_at"),
     )

@@ -13,6 +13,7 @@ import {
   StrategyItem,
   CreateStrategyPayload,
 } from "@/lib/api";
+import { Greeting } from "@/components/Greeting";
 
 export default function StrategiesPage() {
   const queryClient = useQueryClient();
@@ -175,6 +176,7 @@ export default function StrategiesPage() {
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-line">
           <div>
+            <Greeting text={(name) => `Hi ${name}, here are your strategies.`} />
             <h2 className="text-2xl font-bold text-strong tracking-tight">Content Strategies</h2>
             <p className="text-sm text-muted mt-1">
               Define niches, target audiences, and attached sources to govern discovery and production.

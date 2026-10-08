@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     supabase_secret_key: str = ""
     supabase_bucket: str = "post-image"
     user_storage_limit_mb: int = 50
+    # SMTP for transactional email (password reset codes). All four must be set to send
+    # real email; without them the code is logged instead, for local development.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "Content OS <no-reply@content-os.local>"
+    smtp_use_tls: bool = True
 
 
 settings = Settings()

@@ -13,7 +13,7 @@ from app.strategies.routes import router as strategies_router
 from app.media.routes import router as media_router
 from app.analytics.routes import router as analytics_router
 from app.platform_settings.routes import router as settings_router
-from app.settings_security.routes import keys_router
+from app.settings_security.routes import keys_router, vault_router
 from app.accounts.routes import router as accounts_router
 from app.accounts.admin import router as admin_router
 from app.llm.openrouter_client import check_api_key_configuration
@@ -51,6 +51,7 @@ app.include_router(media_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
 app.include_router(settings_router, prefix="/api")
 app.include_router(keys_router, prefix="/api")
+app.include_router(vault_router, prefix="/api")
 app.include_router(accounts_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 

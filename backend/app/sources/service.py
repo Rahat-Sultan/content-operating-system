@@ -1,5 +1,6 @@
 import logging
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ from sqlalchemy import select
 
 from app.sources.models import Source, SourceItem, idea_source_items_table
 from app.sources.rss_provider import fetch_rss_items
+from app.sources.url_safety import assert_safe_feed_url
 from app.strategies.models import ContentStrategy, strategy_sources_table
 from app.ideas.lifecycle import add_new_idea_if_unique
 from app.ideas.models import Idea, IdeaStatus
@@ -30,7 +32,9 @@ def get_source(db: Session, source_id: UUID, owner_id=None) -> Source:
 
 def source_name_for(name: str | None, url: str | None) -> str:
     """
-    A source's name is what the user typed, or its link when they typed nothing.
+    A source's name is what the user typed, or a short label from its link when they
+    typed nothing: the first part of the domain, e.g. "krebsonsecurity" for
+    https://krebsonsecurity.com/feed/, "theregister" for www.theregister.com/...
     Raises ValueError when there is neither a name nor a link.
     """
     typed = (name or "").strip()
@@ -38,8 +42,20 @@ def source_name_for(name: str | None, url: str | None) -> str:
         return typed
     link = (url or "").strip()
     if link:
-        return link
+        return default_name_from_url(link)
     raise ValueError("A source needs a name or a link.")
+
+
+def default_name_from_url(url: str) -> str:
+    """The short domain label used as a source's default name. Falls back to the raw link."""
+    host = urlparse(url).hostname
+    if not host:
+        return url
+    host = host.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    label = host.split(".")[0]
+    return label or url
 
 
 def create_source(
@@ -51,6 +67,8 @@ def create_source(
     config: dict[str, Any] | None = None,
     owner_id=None,
 ) -> Source:
+    if url:
+        assert_safe_feed_url(url)
     source = Source(
         id=uuid4(),
         owner_id=owner_id,
@@ -77,10 +95,13 @@ def update_source(
     config: dict[str, Any] | None = None,
 ) -> Source:
     source = get_source(db, source_id, owner_id)
-    auto_named = source.name == (source.url or "")  # named after its link
+    # Named after its link (never hand-edited): re-derive the label when the link changes.
+    auto_named = source.url is not None and source.name == default_name_from_url(source.url)
+    if url:
+        assert_safe_feed_url(url)
     if url is not None:
         if auto_named:
-            source.name = url.strip() or source.name
+            source.name = default_name_from_url(url.strip()) if url.strip() else source.name
         source.url = url
     if name is not None and name.strip():
         source.name = name.strip()

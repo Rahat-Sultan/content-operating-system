@@ -50,6 +50,13 @@ def archive_idea_endpoint(id: UUID, db: Session = Depends(get_db), user: User = 
     return _with_platforms(db, [archive_idea(db, id, user.id)])[0]
 
 
+@router.post("/{id}/select", response_model=IdeaResponse)
+def select_idea_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Moves a NEW idea to SELECTED, so it is ready to start a workflow."""
+    from app.ideas.lifecycle import select_idea
+    return _with_platforms(db, [select_idea(db, id, user.id)])[0]
+
+
 @router.post("/{id}/restore", response_model=IdeaResponse)
 def restore_idea_endpoint(id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)):
     from app.ideas.lifecycle import restore_idea

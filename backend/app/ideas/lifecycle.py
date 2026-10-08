@@ -204,3 +204,34 @@ def stop_and_delete_idea(db: Session, idea_id: UUID, owner_id: UUID) -> dict:
     db.delete(idea)
     db.commit()
     return {"status": "deleted", "published_posts_kept_on_platform": published}
+
+
+def advance_idea(db: Session, idea_id, owner_id, to: IdeaStatus, from_statuses: list[IdeaStatus]) -> bool:
+    """
+    Moves an idea forward one stage. Atomic: the UPDATE only applies when the idea is
+    still in one of from_statuses, so a repeat call is a no-op. Does not commit; the
+    caller's transaction commits it with the change that caused the move.
+    """
+    updated = (
+        db.query(Idea)
+        .filter(Idea.id == idea_id, Idea.owner_id == owner_id, Idea.status.in_(from_statuses))
+        .update({Idea.status: to}, synchronize_session=False)
+    )
+    return updated == 1
+
+
+def select_idea(db: Session, idea_id: UUID, owner_id: UUID) -> Idea:
+    """Moves a NEW idea to SELECTED. Atomic: the UPDATE only applies from NEW."""
+    updated = (
+        db.query(Idea)
+        .filter(Idea.id == idea_id, Idea.owner_id == owner_id, Idea.status == IdeaStatus.NEW)
+        .update({Idea.status: IdeaStatus.SELECTED}, synchronize_session=False)
+    )
+    if updated != 1:
+        db.rollback()
+        current = db.query(Idea).filter(Idea.id == idea_id, Idea.owner_id == owner_id).first()
+        if current is None:
+            raise HTTPException(status_code=404, detail=f"Idea {idea_id} not found.")
+        raise HTTPException(status_code=409, detail=f"Idea is {current.status.value}; only NEW ideas can be selected.")
+    db.commit()
+    return db.query(Idea).filter(Idea.id == idea_id).one()
