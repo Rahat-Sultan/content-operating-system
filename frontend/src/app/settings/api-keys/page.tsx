@@ -1,7 +1,12 @@
 "use client";
 
 import { ApiKeysSection } from "../parts";
+import { VaultGate } from "@/components/VaultGate";
 
 export default function ApiKeysPage() {
-  return <ApiKeysSection />;
+  return (
+    <VaultGate>
+      <ApiKeysSection />
+    </VaultGate>
+  );
 }

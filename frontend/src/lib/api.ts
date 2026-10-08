@@ -928,3 +928,41 @@ export async function updateDisplayName(display_name: string): Promise<Account> 
   if (!res.ok) throw await errorFrom(res, "Could not update the name.");
   return res.json();
 }
+
+export interface VaultStatus {
+  configured: boolean;
+  unlocked: boolean;
+  unlocked_until: string | null;
+}
+
+export async function fetchVaultStatus(): Promise<VaultStatus> {
+  const res = await apiFetch(`${API_BASE}/settings/vault/status`);
+  if (!res.ok) throw await errorFrom(res, "Could not check the settings lock.");
+  return res.json();
+}
+
+export async function setVaultPassword(current_password: string | null, new_password: string) {
+  const res = await apiFetch(`${API_BASE}/settings/vault/set`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password, new_password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Could not set the settings password.");
+  return res.json();
+}
+
+export async function unlockVault(password: string): Promise<{ unlocked_until: string }> {
+  const res = await apiFetch(`${API_BASE}/settings/vault/unlock`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) throw await errorFrom(res, "Wrong settings password.");
+  return res.json();
+}
+
+export async function lockVault() {
+  const res = await apiFetch(`${API_BASE}/settings/vault/lock`, { method: "POST" });
+  if (!res.ok) throw await errorFrom(res, "Could not lock settings.");
+  return res.json();
+}
