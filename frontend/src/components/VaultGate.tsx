@@ -62,13 +62,82 @@ function UnlockedBar({ unlockedUntil }: { unlockedUntil: string | null }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vault-status"] }),
   });
 
+  const [changing, setChanging] = useState(false);
+
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-raised/40 px-3 py-2 text-xs text-muted">
-      <span>🔓 {label}</span>
-      <button type="button" onClick={() => lock.mutate()} disabled={lock.isPending} className="font-semibold text-accent-text hover:underline">
-        {lock.isPending ? "Locking…" : "Lock now"}
-      </button>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-raised/40 px-3 py-2 text-xs text-muted">
+        <span>🔓 {label}</span>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setChanging((v) => !v)} className="font-semibold text-accent-text hover:underline">
+            {changing ? "Cancel" : "Change password"}
+          </button>
+          <button type="button" onClick={() => lock.mutate()} disabled={lock.isPending} className="font-semibold text-accent-text hover:underline">
+            {lock.isPending ? "Locking…" : "Lock now"}
+          </button>
+        </div>
+      </div>
+      {changing && <ChangeVaultPasswordForm onDone={() => setChanging(false)} />}
     </div>
+  );
+}
+
+function ChangeVaultPasswordForm({ onDone }: { onDone: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const save = useMutation({
+    mutationFn: () => setVaultPassword(current, next),
+    onSuccess: () => {
+      setError(null);
+      setDone(true);
+      setTimeout(onDone, 1200);
+    },
+    onError: (e: any) => setError(e.message),
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setError(null);
+        if (next !== confirm) {
+          setError("The new password and its confirmation don't match.");
+          return;
+        }
+        save.mutate();
+      }}
+      className="cos-card p-4 space-y-3 max-w-sm"
+      data-testid="vault-change-password-form"
+    >
+      <h4 className="text-sm font-semibold text-body-strong">Change settings password</h4>
+      <div>
+        <span className="cos-label">Current settings password</span>
+        <div className="mt-1">
+          <PasswordInput value={current} onChange={setCurrent} autoComplete="current-password" testId="vault-change-current" />
+        </div>
+      </div>
+      <div>
+        <span className="cos-label">New settings password</span>
+        <div className="mt-1">
+          <PasswordInput value={next} onChange={setNext} autoComplete="new-password" testId="vault-change-new" />
+        </div>
+        <p className="mt-1 text-[11px] text-faint">At least 10 characters.</p>
+      </div>
+      <div>
+        <span className="cos-label">Confirm new password</span>
+        <div className="mt-1">
+          <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" testId="vault-change-confirm" />
+        </div>
+      </div>
+      {error && <p className="text-xs text-bad">{error}</p>}
+      <button type="submit" className="cos-btn-primary w-full" disabled={save.isPending || !current || !next || !confirm}>
+        {save.isPending ? "Saving…" : done ? "Saved" : "Change password"}
+      </button>
+    </form>
   );
 }
 
