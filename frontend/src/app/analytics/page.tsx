@@ -3,6 +3,7 @@
 import { ScrollX } from "@/components/ScrollX";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAnalyticsSummary, AnalyticsSummaryPost } from "@/lib/api";
 import { PlatformBadge, platformLabel } from "@/components/PlatformBadge";
@@ -61,7 +62,17 @@ function ImpressionsBars({ posts }: { posts: AnalyticsSummaryPost[] }) {
 
 export default function AnalyticsPage() {
   const [includeTest, setIncludeTest] = useState(false);
-  const [tab, setTab] = useState<string>(ALL);
+  // The selected platform lives in the URL, so a reload (or a shared link) stays on it.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("platform") || ALL;
+  function setTab(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === ALL) params.delete("platform");
+    else params.set("platform", next);
+    const qs = params.toString();
+    router.replace(qs ? `/analytics?${qs}` : "/analytics");
+  }
   const platformParam = tab === ALL ? undefined : tab;
   const { data, isLoading, error } = useQuery({
     queryKey: ["analytics-summary", includeTest, platformParam ?? ALL],
