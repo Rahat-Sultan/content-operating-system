@@ -3,8 +3,92 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { fetchSources, createSource, fetchSourceSuggestions, SourceOption, CreateSourcePayload } from "@/lib/api";
+import { fetchSources, createSource, updateSource, fetchSourceSuggestions, SourceOption, CreateSourcePayload } from "@/lib/api";
 import { Greeting } from "@/components/Greeting";
+
+function SourceName({ source }: { source: SourceOption }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(source.name);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = useMutation({
+    mutationFn: () => updateSource(source.id, { name }),
+    onSuccess: () => {
+      setError(null);
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
+    },
+    onError: (e: any) => setError(e.message),
+  });
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setError(null);
+          if (!name.trim()) {
+            setError("Name can't be empty.");
+            return;
+          }
+          save.mutate();
+        }}
+        className="flex items-center gap-1.5 min-w-0 flex-1"
+        data-testid={`source-name-form-${source.id}`}
+      >
+        <input
+          className="cos-input py-1 text-sm font-semibold"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+          maxLength={120}
+        />
+        <button type="submit" className="cos-btn-primary whitespace-nowrap px-2 py-1 text-xs" disabled={save.isPending}>
+          {save.isPending ? "…" : "Save"}
+        </button>
+        <button
+          type="button"
+          className="cos-btn whitespace-nowrap px-2 py-1 text-xs"
+          onClick={() => {
+            setName(source.name);
+            setError(null);
+            setEditing(false);
+          }}
+        >
+          Cancel
+        </button>
+        {error && <p className="text-[11px] text-bad">{error}</p>}
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group flex min-w-0 flex-1 items-center gap-1.5 text-left"
+      title="Edit name"
+    >
+      <h3 className="font-semibold text-strong truncate">{source.name}</h3>
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className="shrink-0 text-faint opacity-0 group-hover:opacity-100"
+      >
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
+      </svg>
+    </button>
+  );
+}
 
 export default function SourcesPage() {
   const queryClient = useQueryClient();
@@ -178,9 +262,9 @@ export default function SourcesPage() {
                   className="p-5 rounded-xl bg-panel/60 border border-line flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-strong break-all">{source.url || source.name}</h3>
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <SourceName source={source} />
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-raised text-body border border-line-strong">
                           {source.source_type}
                         </span>

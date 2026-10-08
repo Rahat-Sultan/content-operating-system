@@ -17,7 +17,7 @@ type NavItem = {
 type NavGroup = { label: string; items: NavItem[] };
 
 // One menu for every page. Add a page here and it appears on every screen size.
-function buildNav(isAdmin: boolean): NavGroup[] {
+function buildNav(): NavGroup[] {
   const groups: NavGroup[] = [
     {
       label: "Create",
@@ -53,9 +53,7 @@ function buildNav(isAdmin: boolean): NavGroup[] {
     },
   ];
   // Settings is reached from the account menu at the bottom, not from the main nav.
-  if (isAdmin) {
-    groups.push({ label: "Admin", items: [{ label: "Users", href: "/admin" }] });
-  }
+  // Admin is reached from the account menu at the bottom, not from the main nav.
   return groups;
 }
 
@@ -151,15 +149,13 @@ function NavRow({
 function NavList({
   pathname,
   query,
-  isAdmin,
   onNavigate,
 }: {
   pathname: string;
   query: URLSearchParams;
-  isAdmin: boolean;
   onNavigate?: () => void;
 }) {
-  const nav = buildNav(isAdmin);
+  const nav = buildNav();
   return (
     <nav aria-label="Main" className="space-y-6">
       {nav.map((group) => (
@@ -351,8 +347,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const query = new URLSearchParams(searchParams?.toString() ?? "");
   const [open, setOpen] = useState(false);
-  const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
-  const isAdmin = me?.is_admin ?? false;
 
   // Desktop sidebar can be hidden; remembered per browser, not per account.
   const [collapsed, setCollapsed] = useState(false);
@@ -411,7 +405,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         {!collapsed && (
           <div className="flex-1 overflow-y-auto">
-            <NavList pathname={pathname} query={query} isAdmin={isAdmin} />
+            <NavList pathname={pathname} query={query} />
           </div>
         )}
         {collapsed && <div className="flex-1" />}
@@ -460,7 +454,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
             <div className="flex-1">
-              <NavList pathname={pathname} query={query} isAdmin={isAdmin} onNavigate={() => setOpen(false)} />
+              <NavList pathname={pathname} query={query} onNavigate={() => setOpen(false)} />
             </div>
             <AccountFooter />
           </div>
