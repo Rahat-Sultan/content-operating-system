@@ -20,6 +20,9 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # A second password, separate from the login password, that gates API keys and
+    # Platforms in Settings. Unset until the account sets one.
+    vault_password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -48,3 +51,18 @@ class PasswordResetCode(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class VaultUnlock(Base):
+    """
+    Records that one browser session has unlocked the Settings vault (API keys and
+    Platforms), until expires_at. Tied to the login session, not the account, so a second
+    device or a new login must unlock separately. Deleted with the session it belongs to.
+    """
+    __tablename__ = "vault_unlocks"
+
+    session_token_hash: Mapped[str] = mapped_column(
+        Text, ForeignKey("user_sessions.token_hash", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
