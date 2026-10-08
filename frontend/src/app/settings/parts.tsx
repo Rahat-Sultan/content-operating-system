@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlatformLogo } from "@/components/PlatformBadge";
 import { PasswordInput } from "@/components/PasswordInput";
+import { RevealInput } from "@/components/RevealInput";
 import {
   ApiKeyState,
   changePassword,
@@ -124,10 +125,18 @@ function PlatformCard({ p }: { p: PlatformSetting }) {
 
         <div>
           <span className="cos-label">Buffer channel ID</span>
-          <input className="cos-input mt-1 font-mono" value={channelId} placeholder="e.g. 6ab12cd3…"
-            onChange={(e) => setChannelId(e.target.value)} disabled={p.publishes_via !== "buffer"} />
+          <div className="mt-1">
+            <RevealInput
+              className="cos-input font-mono"
+              value={channelId}
+              onChange={setChannelId}
+              placeholder="e.g. 6ab12cd3…"
+              disabled={p.publishes_via !== "buffer"}
+              testId={`channel-id-${p.key}`}
+            />
+          </div>
           <p className="mt-1 text-[11px] text-faint">
-            Find it in Buffer under the channel's settings. It is an identifier, not a secret.
+            Find it in Buffer under the channel's settings. It is an identifier, not a secret, but hidden here by default.
           </p>
         </div>
 
