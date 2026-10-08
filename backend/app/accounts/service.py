@@ -13,12 +13,17 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.accounts.models import PasswordResetCode, User, UserSession
+from app.config import settings
 from app.db import get_db
 from app.settings_security.crypto import (
     MIN_PASSWORD_LENGTH, hash_password, new_session_token, token_hash, verify_password,
 )
 
 COOKIE_NAME = "cos_session"
+# The cookie is marked Secure outside local development, so it is never sent over plain
+# HTTP once the app is deployed. Local dev stays on http://localhost, where Secure
+# would block the cookie entirely.
+COOKIE_SECURE = settings.environment != "development"
 SESSION_LIFETIME = timedelta(hours=8)
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT = timedelta(minutes=15)
@@ -76,7 +81,7 @@ def _start_session(db: Session, user: User, response: Response) -> None:
     db.add(UserSession(token_hash=token_hash(token), user_id=user.id, expires_at=_now() + SESSION_LIFETIME))
     db.commit()
     # No max_age: the browser discards the cookie when the browser session ends.
-    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="strict", path="/api")
+    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="strict", secure=COOKIE_SECURE, path="/api")
 
 
 def login(db: Session, email: str, password: str, response: Response) -> User:

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import Cookie, Depends, HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.accounts.models import User, VaultUnlock
@@ -16,6 +17,8 @@ from app.settings_security.crypto import MIN_PASSWORD_LENGTH, hash_password, tok
 
 UNLOCK_LIFETIME = timedelta(minutes=15)
 LOCKED_DETAIL = "Settings are locked. Enter your settings password to continue."
+MAX_UNLOCK_ATTEMPTS = 5
+UNLOCK_COOLDOWN = timedelta(minutes=15)
 
 
 def _now() -> datetime:
@@ -47,8 +50,17 @@ def unlock_vault(db: Session, user: User, session_token: str | None, password: s
         raise HTTPException(status_code=401, detail="Please log in.")
     if user.vault_password_hash is None:
         raise HTTPException(status_code=403, detail="Set a settings password first.")
+    if user.vault_locked_until and user.vault_locked_until > _now():
+        raise HTTPException(status_code=423, detail="Too many wrong attempts. Try again later.")
     if not verify_password(password, user.vault_password_hash):
+        db.execute(text(
+            "UPDATE users SET vault_failed_attempts = vault_failed_attempts + 1, "
+            "vault_locked_until = CASE WHEN vault_failed_attempts + 1 >= :max THEN now() + :lock ELSE vault_locked_until END "
+            "WHERE id = :id"
+        ), {"max": MAX_UNLOCK_ATTEMPTS, "lock": UNLOCK_COOLDOWN, "id": user.id})
+        db.commit()
         raise HTTPException(status_code=401, detail="Wrong settings password.")
+    db.execute(text("UPDATE users SET vault_failed_attempts = 0, vault_locked_until = NULL WHERE id = :id"), {"id": user.id})
 
     expires_at = _now() + UNLOCK_LIFETIME
     th = token_hash(session_token)

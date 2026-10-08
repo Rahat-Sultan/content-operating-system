@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.sources.models import Source, SourceItem, idea_source_items_table
 from app.sources.rss_provider import fetch_rss_items
+from app.sources.url_safety import assert_safe_feed_url
 from app.strategies.models import ContentStrategy, strategy_sources_table
 from app.ideas.lifecycle import add_new_idea_if_unique
 from app.ideas.models import Idea, IdeaStatus
@@ -66,6 +67,8 @@ def create_source(
     config: dict[str, Any] | None = None,
     owner_id=None,
 ) -> Source:
+    if url:
+        assert_safe_feed_url(url)
     source = Source(
         id=uuid4(),
         owner_id=owner_id,
@@ -94,6 +97,8 @@ def update_source(
     source = get_source(db, source_id, owner_id)
     # Named after its link (never hand-edited): re-derive the label when the link changes.
     auto_named = source.url is not None and source.name == default_name_from_url(source.url)
+    if url:
+        assert_safe_feed_url(url)
     if url is not None:
         if auto_named:
             source.name = default_name_from_url(url.strip()) if url.strip() else source.name

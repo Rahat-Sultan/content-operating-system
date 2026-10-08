@@ -3,12 +3,14 @@ import hashlib
 from typing import Any
 import feedparser
 
+from app.sources.url_safety import assert_safe_feed_url
+
 
 def fetch_rss_items(feed_url: str) -> list[dict[str, Any]]:
     """
     Fetches a real RSS feed URL, parses it, and returns normalized items.
     Deterministic ingestion — no LLM involved.
-    
+
     Returns a list of dicts:
       - title: str
       - url: str
@@ -18,6 +20,9 @@ def fetch_rss_items(feed_url: str) -> list[dict[str, Any]]:
       - external_id: str
       - content_hash: str
     """
+    # Defense in depth: create/update already reject an unsafe URL, but this is the
+    # one place that actually issues the request, so it checks again.
+    assert_safe_feed_url(feed_url)
     feed = feedparser.parse(feed_url)
     items: list[dict[str, Any]] = []
 

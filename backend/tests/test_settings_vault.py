@@ -19,6 +19,7 @@ from app.db import engine
 from app.accounts.models import User, UserSession, VaultUnlock
 from app.accounts.service import new_session_token, token_hash
 from app.settings_security.vault import (
+    MAX_UNLOCK_ATTEMPTS,
     UNLOCK_LIFETIME,
     _now,
     lock_vault,
@@ -73,6 +74,25 @@ class SettingsVaultTest(unittest.TestCase):
         with self.assertRaises(HTTPException) as ctx:
             unlock_vault(self.db, self.user, self.token, "nope")
         self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_too_many_wrong_attempts_locks_out_even_the_correct_password(self):
+        set_vault_password(self.db, self.user, None, "vault-password-123")
+        for _ in range(MAX_UNLOCK_ATTEMPTS):
+            with self.assertRaises(HTTPException):
+                unlock_vault(self.db, self.user, self.token, "nope")
+        self.db.refresh(self.user)
+        with self.assertRaises(HTTPException) as ctx:
+            unlock_vault(self.db, self.user, self.token, "vault-password-123")
+        self.assertEqual(ctx.exception.status_code, 423)
+
+    def test_a_correct_unlock_resets_the_failed_count(self):
+        set_vault_password(self.db, self.user, None, "vault-password-123")
+        with self.assertRaises(HTTPException):
+            unlock_vault(self.db, self.user, self.token, "nope")
+        unlock_vault(self.db, self.user, self.token, "vault-password-123")
+        self.db.refresh(self.user)
+        self.assertEqual(self.user.vault_failed_attempts, 0)
+        self.assertIsNone(self.user.vault_locked_until)
 
     def test_unlock_with_correct_password_lets_the_dependency_pass(self):
         set_vault_password(self.db, self.user, None, "vault-password-123")

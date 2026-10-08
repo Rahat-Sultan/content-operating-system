@@ -141,7 +141,7 @@ def google_start(db: Session = Depends(get_db)):
         "prompt": "select_account",
     })
     response = RedirectResponse(f"{GOOGLE_AUTH}?{query}", status_code=302)
-    response.set_cookie("cos_oauth_state", state, httponly=True, samesite="lax", path="/api/auth/google", max_age=600)
+    response.set_cookie("cos_oauth_state", state, httponly=True, samesite="lax", secure=service.COOKIE_SECURE, path="/api/auth/google", max_age=600)
     return response
 
 

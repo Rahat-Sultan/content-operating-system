@@ -21,8 +21,12 @@ class User(Base):
     failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # A second password, separate from the login password, that gates API keys and
-    # Platforms in Settings. Unset until the account sets one.
+    # Platforms in Settings. Unset until the account sets one. Locked out the same way
+    # as the login password, since a stolen session cookie must not let an attacker
+    # brute-force it from inside the app.
     vault_password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vault_failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    vault_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
