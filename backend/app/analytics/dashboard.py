@@ -57,32 +57,25 @@ def build_summary(db: Session, include_test: bool = False, platform: str | None 
             counts[snap.publication_id] = counts.get(snap.publication_id, 0) + 1
             latest.setdefault(snap.publication_id, snap)
 
-    # Workflow run for each publication (for linking to its page).
+    # Workflow run and idea title for each publication (for linking to its page and
+    # naming it), in one pass — these were two separate queries over the same join.
     run_for: dict = {}
     idea_title_for: dict = {}
     if pub_ids:
-        pairs = (
-            db.query(Publication.id, Content.workflow_run_id)
-            .join(ContentVersion, ContentVersion.id == Publication.content_version_id)
-            .join(Content, Content.id == ContentVersion.content_id)
-            .filter(Publication.id.in_(pub_ids))
-            .all()
-        )
-        run_for = {pid: str(run_id) for pid, run_id in pairs}
-
-        # Idea title for each publication, so the table names the post by its idea.
         from app.workflows.models import WorkflowRun
         from app.ideas.models import Idea
-        title_rows = (
-            db.query(Publication.id, Idea.title)
+        rows = (
+            db.query(Publication.id, Content.workflow_run_id, Idea.title)
             .join(ContentVersion, ContentVersion.id == Publication.content_version_id)
             .join(Content, Content.id == ContentVersion.content_id)
-            .join(WorkflowRun, WorkflowRun.id == Content.workflow_run_id)
-            .join(Idea, Idea.id == WorkflowRun.idea_id)
+            .outerjoin(WorkflowRun, WorkflowRun.id == Content.workflow_run_id)
+            .outerjoin(Idea, Idea.id == WorkflowRun.idea_id)
             .filter(Publication.id.in_(pub_ids))
             .all()
         )
-        idea_title_for = {pid: title for pid, title in title_rows}
+        for pid, run_id, title in rows:
+            run_for[pid] = str(run_id)
+            idea_title_for[pid] = title
 
     posts = []
     for pub in pubs:

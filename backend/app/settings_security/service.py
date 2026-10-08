@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.config import Settings, settings
+from app.config import settings
 from app.settings_security.crypto import EncryptionKeyMissing, decrypt, encrypt
 from app.settings_security.models import SecretValue
 
@@ -25,7 +25,7 @@ def list_keys(db: Session, owner_id: UUID) -> list[dict]:
     for name, (label, attr) in MANAGED_KEYS.items():
         row = rows.get(name)
         # A key from .env is the installation default. It is shown to the owner of the installation only.
-        env_value = getattr(Settings(), attr, "") or ""
+        env_value = getattr(settings, attr, "") or ""
         out.append({
             "name": name,
             "label": label,

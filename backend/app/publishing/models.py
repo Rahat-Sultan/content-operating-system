@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -59,3 +59,9 @@ class Publication(OwnedMixin, Base):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # No cross-domain relationships — use service layer to join across domains
+
+    __table_args__ = (
+        # "Does this version have a publication?" (the run page's publication lookup)
+        # filtered on this with no index — a full table scan on every run page view.
+        Index("ix_publications_content_version_id", "content_version_id"),
+    )

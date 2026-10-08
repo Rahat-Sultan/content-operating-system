@@ -93,6 +93,9 @@ class WorkflowRun(OwnedMixin, Base):
                 status.in_(["PENDING", "RUNNING", "PAUSED", "NEEDS_REVIEW", "PUBLISHING"])
             ),
         ),
+        # The partial index above only covers active runs. Stop-and-delete, duplicate
+        # checks and run-history lookups filter on idea_id across every status.
+        Index("ix_workflow_runs_idea_id", "idea_id"),
     )
 
 
