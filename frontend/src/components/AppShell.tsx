@@ -51,21 +51,8 @@ function buildNav(isAdmin: boolean): NavGroup[] {
       label: "Results",
       items: [{ label: "Analytics", href: "/analytics" }],
     },
-    {
-      label: "Account",
-      items: [
-        {
-          label: "Settings",
-          href: "/settings",
-          children: [
-            { label: "Account", href: "/settings/account" },
-            { label: "Platforms", href: "/settings/platforms" },
-            { label: "API keys", href: "/settings/api-keys" },
-          ],
-        },
-      ],
-    },
   ];
+  // Settings is reached from the account menu at the bottom, not from the main nav.
   if (isAdmin) {
     groups.push({ label: "Admin", items: [{ label: "Users", href: "/admin" }] });
   }
@@ -232,7 +219,17 @@ function ChevronRightIcon() {
   );
 }
 
-function AccountFooter() {
+// A panel with a divided left rail — toggles the sidebar open or closed.
+function SidebarToggleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="9" y1="4" x2="9" y2="20" />
+    </svg>
+  );
+}
+
+function AccountFooter({ collapsed = false }: { collapsed?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
@@ -266,30 +263,37 @@ function AccountFooter() {
   }
 
   return (
-    <div ref={ref} className="relative border-t border-line pt-3 px-3">
+    <div ref={ref} className={`relative border-t border-line pt-3 ${collapsed ? "px-1.5 flex justify-center" : "px-3"}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left hover:bg-raised"
+        aria-label={collapsed ? (me.display_name ?? me.email) : undefined}
+        className={`flex items-center gap-2.5 rounded-lg py-1.5 text-left hover:bg-raised ${collapsed ? "justify-center px-1.5" : "w-full px-1.5"}`}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">
           {initialsOf(me)}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-body-strong" data-testid="account-email">
-            {me.display_name ?? me.email}
-          </span>
-          <span className="block truncate text-[11px] text-subtle">{me.is_admin ? "Admin" : "Member"}</span>
-        </span>
-        <ChevronRightIcon />
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-body-strong" data-testid="account-email">
+                {me.display_name ?? me.email}
+              </span>
+              <span className="block truncate text-[11px] text-subtle">{me.is_admin ? "Admin" : "Member"}</span>
+            </span>
+            <ChevronRightIcon />
+          </>
+        )}
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-line bg-panel shadow-xl shadow-black/40 py-1.5 overflow-hidden"
+          className={`absolute bottom-full mb-2 w-60 rounded-xl border border-line bg-panel shadow-xl shadow-black/40 py-1.5 overflow-hidden ${
+            collapsed ? "left-0" : "left-0 right-0"
+          }`}
         >
           <button
             type="button"
@@ -350,6 +354,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: fetchMe });
   const isAdmin = me?.is_admin ?? false;
 
+  // Desktop sidebar can be hidden; remembered per browser, not per account.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("cos-sidebar-collapsed") === "1");
+    } catch {
+      // Private browsing or blocked storage: default to expanded.
+    }
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("cos-sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        // Nothing to persist to; the toggle still works for this page view.
+      }
+      return next;
+    });
+  }
+
   // Close the drawer after navigating and on Escape.
   useEffect(() => setOpen(false), [pathname, searchParams]);
   useEffect(() => {
@@ -362,14 +387,35 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-20 w-60 flex-col gap-6 border-r border-line bg-panel px-3 py-6">
-        <Link href="/analytics" className="px-3 text-sm font-bold tracking-tight text-strong">
-          Content OS
-        </Link>
-        <div className="flex-1 overflow-y-auto">
-          <NavList pathname={pathname} query={query} isAdmin={isAdmin} />
+      <aside
+        className={`hidden lg:flex fixed inset-y-0 left-0 z-20 flex-col gap-6 border-r border-line bg-panel py-6 transition-[width] ${
+          collapsed ? "w-14 px-2" : "w-60 px-3"
+        }`}
+      >
+        <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between px-3"}`}>
+          {!collapsed && (
+            <Link href="/analytics" className="text-sm font-bold tracking-tight text-strong">
+              Content OS
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Show sidebar" : "Hide sidebar"}
+            aria-pressed={!collapsed}
+            title={collapsed ? "Show sidebar" : "Hide sidebar"}
+            className="shrink-0 rounded-md p-1.5 text-muted hover:bg-raised hover:text-body-strong"
+          >
+            <SidebarToggleIcon />
+          </button>
         </div>
-        <AccountFooter />
+        {!collapsed && (
+          <div className="flex-1 overflow-y-auto">
+            <NavList pathname={pathname} query={query} isAdmin={isAdmin} />
+          </div>
+        )}
+        {collapsed && <div className="flex-1" />}
+        <AccountFooter collapsed={collapsed} />
       </aside>
 
       {/* Phone and tablet top bar */}
@@ -421,7 +467,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className="lg:pl-60">{children}</div>
+      <div className={`transition-[padding] ${collapsed ? "lg:pl-14" : "lg:pl-60"}`}>{children}</div>
     </div>
   );
 }
